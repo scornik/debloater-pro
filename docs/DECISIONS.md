@@ -1255,3 +1255,100 @@ checked rather than trusted.
   "after" is a fresh look at the site rather than arithmetic on the old one.
 - No metric measures time, and none ever will: page-load time on somebody else's
   host depends on their hosting, their network and their visitors.
+
+---
+
+## D-0026 — What counts as an orphan, per meta type
+
+- **Phase:** 10
+- **Date:** 2026-09-03
+- **Status:** Accepted
+- **Spec:** §16, §17 Phase 10
+
+### Context
+
+§17 Phase 10 requires this definition to be written down **before** the code
+exists, and the reason is worth stating: "orphan metadata" sounds like a fact
+about the database and is actually a judgement. Every wrong answer here deletes
+somebody's data, and the plugin's own recovery point is the only thing between a
+wrong definition and a lost row.
+
+The dangerous case is not the row whose parent is gone. It is the row whose
+parent is *not gone but is not where we looked* — a custom table, a soft delete,
+an object type registered by a plugin that was inactive when the scan ran.
+
+### Decision
+
+An orphan is a metadata row whose parent object **does not exist in the table
+that WordPress itself joins against**, checked with a `LEFT JOIN … IS NULL`
+against that table and nothing cleverer.
+
+| Meta table | Parent | Orphan when |
+|---|---|---|
+| `postmeta` | `posts.ID` | No row in `posts` with that `post_id`. Every post status counts as existing, including `auto-draft`, `trash` and `inherit` — a revision's meta is not an orphan just because the revision is a revision. |
+| `termmeta` | `terms.term_id` | No row in `terms` with that `term_id`. Term *relationships* are not consulted: a term with no posts is an empty term, not a deleted one. |
+| `usermeta` | `users.ID` | No row in `users` with that `user_id`. |
+| `commentmeta` | `comments.comment_ID` | No row in `comments` with that `comment_id`. Spam and trashed comments still exist, so their meta is not orphaned. |
+
+Three exclusions apply to every type, and each of them is a row that a naive
+`LEFT JOIN` would happily delete:
+
+1. **`user_id = 0` in `usermeta`, and any `*_id = 0`.** Zero is not a missing
+   parent, it is a sentinel several plugins use deliberately.
+2. **Multisite.** Orphan cleanup does not run on a multisite install in v1. User
+   meta is shared across the network there, and "no row in this site's tables"
+   is not the same question at all.
+3. **Anything added within the last hour.** A row written moments ago is far more
+   likely to be half of an operation still in progress than a leftover of one
+   that finished years ago. Meta tables carry no timestamp, so this is applied
+   by excluding parents created recently rather than the meta itself, which is
+   the conservative direction: it can only *keep* rows.
+
+### Consequences
+
+- The definition under-deletes on purpose. A row this misses costs disk space; a
+  row it should not have deleted costs somebody their data.
+- It is a plain `LEFT JOIN`, so it can be read, checked and disagreed with by
+  anyone who knows SQL. A cleverer definition that nobody can audit would be
+  worse even if it were more accurate.
+- Every orphan removed is stored first, with its `meta_id`, and restored with
+  that same `meta_id` — so a round trip is indistinguishable from never having
+  run.
+- On multisite the finding still reports what it sees and the operation refuses
+  to run, rather than quietly reporting nothing.
+
+---
+
+## D-0027 — Level C is an attestation, never a substitute
+
+- **Phase:** 10
+- **Date:** 2026-09-03
+- **Status:** Accepted
+- **Spec:** §12 rule 8, §17 Phase 10
+
+### Context
+
+The destructive confirmation offers a checkbox: "I have an external backup".
+§17 Phase 10 requires it, and requires that it never substitutes for the Level B
+snapshot. The temptation is obvious — a user who has their own backup does not
+need ours, and skipping it would make a large deletion much faster.
+
+### Decision
+
+The checkbox records a statement and changes nothing else. Level B is taken
+whether or not it is ticked; a destructive operation with no complete Level B
+snapshot is refused with the box ticked exactly as it is without it.
+
+What the attestation is for: it is written into the run so that a later
+conversation about a deletion has a record of what the user believed at the
+time. That is worth having. It is not worth a single skipped backup.
+
+### Consequences
+
+- Ticking the box makes nothing faster, which some users will find pointless.
+  The alternative is a plugin whose safety depends on a stranger's claim about
+  infrastructure it cannot see.
+- `SnapshotLevel::C` therefore never appears alone on a plan. It appears
+  alongside B, or not at all.
+- The refusal test does not care about the attestation, which is the point: it
+  passes a ticked box and still expects the refusal.
