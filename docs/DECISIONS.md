@@ -627,3 +627,83 @@ Debloat's decision.
   is why we are not touching it" is worth more than a confident switch.
 - XML-RPC may become actionable in a later phase once the resolver can tell
   whether anything is using it. The file editor will not.
+
+---
+
+## D-0013 — Which of two conflicting tweaks survives
+
+- **Phase:** 4
+- **Date:** 2026-09-02
+- **Status:** Accepted
+
+### Context
+
+`BUILD-SPEC.md` §7.4 requires that two conflicting tweaks are never both in a
+plan. It does not say which one to keep, and the first implementation kept
+whichever came first by tweak id — which is deterministic and otherwise
+arbitrary.
+
+The property tests caught the consequence: under the safe profile a
+medium-risk tweak was filtered out, so its lower-id conflicting partner got in;
+under the maximum profile the medium-risk one was admitted first and won. A
+*wider* profile therefore produced a plan missing something the narrower one
+had offered, which is a surprising thing for "include more" to do.
+
+### Decision
+
+Candidates are ordered before anything is decided, and the first one considered
+wins a conflict:
+
+1. **Non-destructive before destructive.** Between two changes that cannot both
+   be applied, the one that deletes nothing is the better default.
+2. **Lower risk before higher.** Same reasoning, one step down.
+3. **Tweak id**, so the result is deterministic when the first two tie.
+
+### Consequences
+
+- Widening a profile now only ever adds to a plan, which is what a user
+  reasonably expects from "include more kinds of change".
+- The rule is a property of the tweaks rather than of the caller's argument
+  order, so a plan is reproducible from its inputs alone.
+- A registry author who wants a specific tweak to win a conflict says so by
+  giving it a lower risk, which is a claim they have to be able to justify —
+  rather than by naming it earlier in the alphabet.
+
+---
+
+## D-0014 — A requirement is only satisfied by a tweak that is in the plan
+
+- **Phase:** 4
+- **Date:** 2026-09-02
+- **Status:** Accepted
+
+### Context
+
+`BUILD-SPEC.md` §7.4: no tweak with unresolved `requires` may enter a plan. The
+first implementation checked requirements against the **candidate** list, which
+is what the planner was handed before any filtering.
+
+The property tests found the hole immediately: a tweak whose requirement was
+itself excluded — refused, filtered by profile, or dropped for its own unmet
+requirement — still passed the check, because the requirement had been a
+candidate. The plan then contained a change that depended on something that was
+not going to happen.
+
+### Decision
+
+A requirement counts only when the required tweak is **in the plan**. Since
+excluding one tweak can leave another's requirement unmet, and requirements can
+point in either direction, the planner runs a fixed point: drop tweaks with
+unmet requirements, and repeat until nothing more drops out.
+
+Each dropped tweak's exclusion reason names the requirement *and* quotes why
+that requirement is missing, so a chain of exclusions can be read back to its
+cause rather than appearing as an unexplained absence.
+
+### Consequences
+
+- Planning is O(n²) in the worst case, over a set that is at most a few dozen
+  tweaks. Correctness here is worth considerably more than the microseconds.
+- A tweak with a requirement the profile excludes is now excluded too, which is
+  right: applying it alone would do something other than what the registry
+  author described.
