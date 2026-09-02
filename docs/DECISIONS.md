@@ -1298,11 +1298,26 @@ Three exclusions apply to every type, and each of them is a row that a naive
 2. **Multisite.** Orphan cleanup does not run on a multisite install in v1. User
    meta is shared across the network there, and "no row in this site's tables"
    is not the same question at all.
-3. **Anything added within the last hour.** A row written moments ago is far more
-   likely to be half of an operation still in progress than a leftover of one
-   that finished years ago. Meta tables carry no timestamp, so this is applied
-   by excluding parents created recently rather than the meta itself, which is
-   the conservative direction: it can only *keep* rows.
+3. **Anything that arrived after the recovery point was written.** A row written
+   moments ago is far more likely to be half of an operation still in progress —
+   metadata inserted before the object it belongs to — than the leftover of one
+   that finished years ago.
+
+   Meta tables carry no timestamp, so this is enforced by a **collection
+   ceiling** rather than a time window: `collect()` records the highest primary
+   key it saw, and `execute()` will not delete anything above it. That turns out
+   to be the stronger rule, and it applies to every operation in this phase
+   rather than only to metadata.
+
+   The hole it closes is real and was found while writing `OrphanMetaCleanup`:
+   `collect()` writes the recovery point and `execute()` then asks the database
+   again for what matches, so a row that came to match *in between* would have
+   been deleted without ever having been backed up. On a busy site that is not
+   hypothetical — a post is trashed, a comment is marked as spam, a plugin
+   writes metadata a moment before creating its parent. A ceiling of zero means
+   `collect()` found nothing, and nothing is what `execute()` may then delete:
+   §13 rule 8 is about *this* run's recovery point, not one that exists in
+   principle.
 
 ### Consequences
 
@@ -1348,7 +1363,9 @@ time. That is worth having. It is not worth a single skipped backup.
 - Ticking the box makes nothing faster, which some users will find pointless.
   The alternative is a plugin whose safety depends on a stranger's claim about
   infrastructure it cannot see.
-- `SnapshotLevel::C` therefore never appears alone on a plan. It appears
-  alongside B, or not at all.
+- The attestation is recorded on the **run**, not as a snapshot row. A Level C
+  "snapshot" would be a recovery point that contains nothing and can recover
+  nothing — a row in the recovery-points table that lies about what it is. What
+  the user stated belongs in the history of the change, next to what was done.
 - The refusal test does not care about the attestation, which is the point: it
   passes a ticked box and still expects the refusal.
