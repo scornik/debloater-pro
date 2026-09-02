@@ -1000,3 +1000,100 @@ in "we could not tell" is worse than a one-second one.
   check" warns, "there was nothing to check" does not.
 - A probe that throws is also UNKNOWN, for the same reason: our bug is not
   evidence about their site.
+
+---
+
+## D-0021 — `--format=json`, with `--json` as the spelling everyone uses
+
+- **Phase:** 7
+- **Date:** 2026-09-03
+- **Status:** Accepted
+- **Spec:** §17 Phase 7
+
+### Context
+
+§17 Phase 7 specifies `--json` on the read commands. Implemented literally — a
+`[--json]` entry in each command's synopsis — every invocation fails:
+
+```
+$ wp debloat scan --json
+Error: Parameter errors:
+ unknown --format parameter
+```
+
+WP-CLI reserves `--json` as shorthand for `--format=json` and rewrites it during
+argument parsing, before a command is dispatched. A command that declares
+`--json` itself therefore never sees it, and is handed a `--format` it did not
+declare.
+
+### Decision
+
+Each command declares `[--format=<format>]` with the options `table` and `json`.
+WP-CLI's rewriting then makes `--json` work exactly as the specification
+describes, and `--format=json` works too, which is what a WP-CLI user would try
+first.
+
+The check is `wantsJson()`, which accepts either the resolved `format` or a
+plain `json` boolean — the latter for callers that construct the command object
+directly, which is how the integration suite drives it.
+
+### Consequences
+
+- The user-facing behaviour §17 asked for is unchanged: `--json` prints JSON.
+- The synopsis in `wp help debloat scan` says `--format`, which is the
+  convention every other WP-CLI command follows.
+- Documented in `docs/CLI.md` so the two spellings are not a surprise.
+- Found only by running the commands through a real `wp` binary. The unit-style
+  tests drive the command objects directly and could never have caught it, which
+  is the argument for `tools/cli-e2e.sh` existing at all.
+
+---
+
+## D-0022 — What a configuration document carries, and what it refuses to
+
+- **Phase:** 7
+- **Date:** 2026-09-03
+- **Status:** Accepted
+- **Spec:** §17 Phase 7, §13 rule 5
+
+### Context
+
+`wp debloat export` produces "the config-as-code JSON (selection + intent profile
++ params)" and `import` "validates it before use". The question worth deciding is
+what else, if anything, travels with it — a site's findings and score are right
+there, and including them would make the export look more complete.
+
+### Decision
+
+**Choices travel; conclusions do not.** The document carries the selection with
+its parameters, the stated intent, and provenance (plugin version, registry hash,
+site hash, timestamp). It does not carry findings, facts, scores, snapshots or
+run history.
+
+Provenance is recorded and never enforced. A document from another site is the
+entire use case, so `site_hash` is informational. A document from a different
+registry version produces a warning rather than a refusal, because the individual
+changes are validated anyway.
+
+Import validates in three stages, in this order:
+
+1. The whole document against `schemas/config.schema.json`, before a single value
+   is read out of it (§13 rule 5).
+2. Each named change against the registry: does this version have it, and are its
+   parameters valid for it.
+3. The resulting selection through the ordinary planner, so the §7.4 invariants
+   apply exactly as they would to a plan built here.
+
+A change the file names that this version does not have is reported and skipped;
+the rest of the file still applies.
+
+### Consequences
+
+- A findings document from staging can never be imported and acted on in
+  production. Findings describe one site at one moment; transplanting them would
+  be transplanting conclusions drawn from facts that are not true here.
+- Importing is not a way around the rules. A change that would be refused on this
+  site is still refused, and the reason is printed.
+- The schema lives in `schemas/`, not `registry/schemas/`, because it does not
+  describe registry content — §4 names exactly six registry schemas and a
+  repository invariant holds it to six.
