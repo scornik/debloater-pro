@@ -479,3 +479,151 @@ required stopping at Phase 1.
   not a mystery later.
 - Neither change touches the plugin, the tests, or CI. On a machine with a
   working resolver, `npm run env:start` works with no shim.
+
+---
+
+## D-0010 — Confidence penalties and score weights (rubric v1)
+
+- **Phase:** 3
+- **Date:** 2026-09-02
+- **Status:** Accepted
+- **Required by:** `BUILD-SPEC.md` §16 ("Phase 3: confidence penalty values;
+  score weights")
+
+### Context
+
+§6 says confidence is "base confidence × penalties (unknown host, detected
+dependents, cache plugin present, custom code detected)" and §12 fixes the
+severity penalties at 0/4/10/20 with "weights in rubric; v1 equal". The
+multipliers themselves are left to this phase.
+
+### Decision
+
+Recorded in full in `docs/SCORING.md` v1.0. In summary:
+
+| Penalty | Multiplier |
+|---|---|
+| Unknown host | × 0.95 |
+| Cache plugin present | × 0.95 |
+| Detected dependents | × 0.90 each, compounding, capped at three |
+| Custom mu-plugins | × 0.90 |
+
+Two bounds beyond the specification, both chosen so the figure keeps meaning
+what it says:
+
+- **The dependent penalty stops compounding at three.** Past that point the
+  message is already "several things depend on this"; letting it run would drive
+  confidence towards zero and turn a caution into a de-facto refusal, which is
+  what `dont_touch` is for and what it should stay for.
+- **A floor of 0.30.** Below that the honest answer is not a small number, it is
+  that the change should not be recommended at all.
+
+Sub-score weights are equal, as §12 specifies for v1. The alternative would be
+inventing a claim about which category matters more, with nothing behind it.
+
+### Consequences
+
+- The multipliers are deliberately mild. Confidence is an honesty signal shown
+  next to a recommendation, not a mechanism for quietly withdrawing one; a
+  penalty large enough to hide a finding would be doing the refusal's job
+  badly.
+- Confidence is rounded to two decimals so the same site always prints the same
+  figure, and the whole calculation is deterministic.
+- Our own mu-plugin loader is excluded from the custom-code check. Penalising
+  confidence for having installed WP Debloat would be absurd.
+
+---
+
+## D-0011 — Removing a capability and affecting one are different things
+
+- **Phase:** 3
+- **Date:** 2026-09-02
+- **Status:** Accepted
+
+### Context
+
+`DontTouchRules` maps a finding to the capability its tweak would change, and
+refuses the finding when a component present on the site declares a dependency
+on that capability.
+
+The first implementation used one map, and it produced a wrong answer
+immediately. WooCommerce declares a dependency on `heartbeat` — correctly; the
+checkout keep-alive needs it. `core.heartbeat_interval` was therefore refused on
+every WooCommerce site. But that tweak does not remove Heartbeat. It slows it
+from 15 seconds to 60. The dependency is still satisfied afterwards.
+
+The unit tests caught it: a store with a single recent editor was being refused
+by the dependency rule, when only the collaborative-editing rule should have
+applied.
+
+### Decision
+
+Two maps, with different consequences:
+
+- **`REMOVES_CAPABILITY`** — the tweak takes the capability away entirely. A
+  present dependent is a **refusal**, naming the dependent.
+- **`AFFECTS_CAPABILITY`** — the tweak changes how the capability behaves
+  without removing it. A present dependent counts towards
+  `dependencies_detected`, which **lowers confidence**, and does not refuse.
+
+`wp.heartbeat.aggressive` is in the second map. It moves to the first the moment
+a tweak exists that switches Heartbeat off rather than slowing it — which
+`BUILD-SPEC.md` §7.1 already anticipates as `core.heartbeat_disable`.
+
+### Consequences
+
+- Refusing a change of degree is left to situational rules, which can weigh how
+  the site is actually used. That is exactly what §17 Phase 3 specifies for
+  Heartbeat: two or more recent editors *and* WooCommerce.
+- A dependency that does not refuse still costs confidence, so nothing is
+  ignored — the site with WooCommerce gets a less certain recommendation, not a
+  silently identical one.
+- The capability vocabulary stays coarse (present or absent), which is what
+  makes it possible to reason about exhaustively. The nuance lives in which map
+  a finding is in, where it is visible and testable, rather than in the
+  vocabulary.
+
+---
+
+## D-0012 — Two findings report and do not act
+
+- **Phase:** 3
+- **Date:** 2026-09-02
+- **Status:** Accepted
+
+### Context
+
+`BUILD-SPEC.md` §17 Phase 3 requires three info-only findings: inactive plugins
+present, file editor enabled, XML-RPC enabled. Two of those are things a
+hardening guide would tell you to change, and it would be easy to offer a
+one-click fix for both. This entry records why we do not.
+
+### Decision
+
+**File editor.** Disabling it means adding `DISALLOW_FILE_EDIT` to
+`wp-config.php`. WP Debloat does not edit `wp-config.php`, and will not. A
+plugin that rewrites the file every request depends on is a plugin that can take
+a site off the internet by getting one line wrong; no amount of care makes that
+a good trade for a setting the user can change in ten seconds. The finding
+explains the risk and gives the exact line.
+
+**XML-RPC.** Disabling it is the most-recommended WordPress hardening step and
+one of the easiest to get wrong. Jetpack uses it. The mobile apps use it. Some
+backup plugins use it. On the sites where it is used, switching it off breaks
+something the owner will not connect to a change made in a different plugin last
+week. Deciding that safely needs the compatibility resolver and the intent
+profile from Phase 4.
+
+**Inactive plugins.** A deactivated plugin is not loaded, so there is no
+performance case at all — claiming one would be exactly the kind of invented
+benefit this product exists not to make. There is a maintenance case, and the
+finding makes it. Deleting a plugin is not reversible from here and is not WP
+Debloat's decision.
+
+### Consequences
+
+- Three findings that cost nothing in the score and propose nothing. That is the
+  correct output, not a placeholder: an honest "here is what we found, and here
+  is why we are not touching it" is worth more than a confident switch.
+- XML-RPC may become actionable in a later phase once the resolver can tell
+  whether anything is using it. The file editor will not.
