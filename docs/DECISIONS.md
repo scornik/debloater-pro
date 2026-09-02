@@ -1097,3 +1097,106 @@ the rest of the file still applies.
 - The schema lives in `schemas/`, not `registry/schemas/`, because it does not
   describe registry content — §4 names exactly six registry schemas and a
   repository invariant holds it to six.
+
+---
+
+## D-0023 — Plain React hooks, and no state library at all
+
+- **Phase:** 8
+- **Date:** 2026-09-03
+- **Status:** Accepted
+- **Spec:** §16, §17 Phase 8
+
+### Context
+
+§16 requires this phase to record how the dashboard manages state, and §17
+rules out external state libraries. The remaining choice is between
+`@wordpress/data` — the store WordPress ships, which the block editor uses — and
+plain component state.
+
+### Options considered
+
+1. **`@wordpress/data`.** Registered stores, selectors, resolvers, and a
+   published API other plugins could read. Rejected: it is designed for state
+   that many unrelated components need at once and that outlives a screen. This
+   dashboard is one screen with four views, and every piece of state it holds is
+   either a server response or which view is open. The store would be ceremony
+   around a fetch.
+2. **An external library — Redux, Zustand, Jotai.** Ruled out by §17 and by the
+   bundle budget, and unnecessary for the same reason as above.
+3. **Plain hooks, with one shared `useResource`.** Accepted.
+
+### Decision
+
+Component state via `useState`, and one hook — `useResource` — for everything
+that comes from the server. It returns a named status (`loading`, `ready`,
+`error`), the data, the error, and a `reload`.
+
+The status is the point. A screen that tracks `data` and `isLoading` separately
+renders "no findings" for the half second before the findings arrive, which is a
+lie told by accident on the one screen whose entire purpose is not to overstate
+what it knows.
+
+There is no router either: this is a single admin page, and the browser's back
+button belongs to WordPress's navigation rather than ours.
+
+### Consequences
+
+- The bundle is 6.7 KB gzipped of JavaScript, against a 250 KB budget, because
+  React, the components and the i18n runtime all come from WordPress.
+- Two screens showing the same data fetch it twice. On this screen that is two
+  requests, and it removes an entire category of stale-cache bug.
+- If a later phase needs state shared across genuinely unrelated components, this
+  decision is worth revisiting rather than working around.
+
+---
+
+## D-0024 — A confirmation token, not just a nonce
+
+- **Phase:** 8
+- **Date:** 2026-09-03
+- **Status:** Accepted
+- **Spec:** §13 rule 12, §17 Phase 8
+
+### Context
+
+§17 Phase 8 requires the restore action to take "an explicit confirmation
+token", and that the UI perform no state change without a confirmation step. The
+straightforward reading is a boolean — `confirm: true` — which makes the request
+deliberate but says nothing about *what* was confirmed.
+
+The gap that matters: a user previews a plan, reads it, and clicks apply. In
+between, a plugin is activated in another tab, or a colleague runs a scan. The
+plan is now different. A boolean confirmation applies the new plan under the old
+agreement.
+
+### Decision
+
+Write endpoints take a token derived from the exact thing being acted on:
+
+- **Apply** — an HMAC over the canonical JSON of the plan, issued by `preview`.
+  The server rebuilds the plan, recomputes the token, and refuses on a mismatch
+  with "this site has changed since that preview".
+- **Rollback** — an HMAC over the recovery point's id, run and checksum, issued
+  by `snapshots`. A token for one recovery point cannot restore another.
+
+Both are keyed on `wp_salt()`, so a token cannot be constructed by anything that
+has not already read the site's secrets.
+
+This is in addition to the capability check and an explicit nonce check on every
+state-changing route — the nonce proves the request came from this site's admin,
+the token proves it was the thing the user was shown.
+
+### Consequences
+
+- The three questions are answered separately and can each be tested separately:
+  may this user do it, did this request come from our screen, and is this the
+  thing they agreed to.
+- A stale preview fails loudly instead of applying something unseen. The user is
+  told to preview again, which is the honest instruction.
+- Requiring a nonce on write routes means they cannot be driven by an
+  application password. That is deliberate: automation has WP-CLI, which is a
+  better fit and leaves a clearer trail.
+- `scan` counts as state-changing — it writes a run — so it needs the nonce too.
+  A Phase 3 test that posted to it without one now sends one, and a new test
+  asserts the refusal.
