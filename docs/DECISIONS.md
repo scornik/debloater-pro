@@ -707,3 +707,180 @@ cause rather than appearing as an unexplained absence.
 - A tweak with a requirement the profile excludes is now excluded too, which is
   right: applying it alone would do something other than what the registry
   author described.
+
+---
+
+## D-0015 — Level B spills to a gzipped file above eight megabytes
+
+- **Phase:** 5
+- **Date:** 2026-09-03
+- **Status:** Accepted
+- **Spec:** §4, §8, §17 Phase 5
+
+### Context
+
+A Level B recovery point holds the exact rows a data operation is about to
+delete. On a site that has never been cleaned, "delete expired transients" can
+be tens of thousands of rows, and a future operation over post revisions can be
+far larger. `BUILD-SPEC.md` §4 puts the overflow in
+`wp-content/wpdebloat/backups/` as gzipped JSON "when > 8 MB" and leaves the
+exact mechanism to this phase.
+
+Keeping everything in `wpdebloat_snapshot_items` is simplest and is what happens
+for the overwhelming majority of runs. It stops being reasonable at scale for
+three reasons: a single snapshot of hundreds of thousands of rows makes every
+query against that table slower for every other snapshot; the rows are read
+exactly once, in bulk, and only if something goes wrong; and hosts with a small
+`max_allowed_packet` start rejecting the inserts, at which point the operation is
+correctly refused but the user simply cannot run it at all.
+
+### Decision
+
+**8 MB (8 × 1024 × 1024 bytes) of uncompressed item payload**, measured as the
+sum of `strlen( Json::encode( $item->payload ) )` as the items are collected.
+
+The threshold cannot be applied before collection begins, because an operation
+declares how many rows it will touch, not how large they are. So items
+accumulate in memory until the running total passes the threshold, at which
+point everything held so far is flushed to a gzipped file and the remainder
+streams straight to it. Below the threshold nothing touches the disk.
+
+The file is newline-delimited canonical JSON, gzipped at level 9, named
+`snapshot-<id>.ndjson.gz` and written mode 0600 into a directory carrying both an
+`index.php` and an `.htaccess` that denies access. Reading streams line by line,
+so restoring a large snapshot does not require holding it in memory either.
+
+The snapshot row records `storage = 'file'` and the path; the checksum is
+computed the same way in both cases — each item digested individually, the
+digests sorted, and the concatenation hashed — so a snapshot verifies
+identically whether it came from the table or the file.
+
+### Consequences
+
+- Two storage paths to keep correct, both exercised by integration tests that
+  cross the real threshold rather than lowering it for the test.
+- A spilled snapshot depends on the filesystem as well as the database. A
+  missing or truncated file fails verification loudly and marks the snapshot
+  corrupt; it never silently restores the rows that survived.
+- `SnapshotManager::forget()` deletes the file alongside the row, so a removed
+  snapshot leaves no orphan.
+- The threshold is a constant rather than an option. A site that needs it lower
+  needs a smaller `max_allowed_packet` accommodation, which is a support
+  conversation, not a setting; adding a knob here would mean two thresholds to
+  test and a way for a user to make their own recovery worse.
+
+---
+
+## D-0016 — Recovery points are never expired automatically
+
+- **Phase:** 5
+- **Date:** 2026-09-03
+- **Status:** Accepted
+- **Spec:** §8, §16
+
+### Context
+
+The obvious retention policy is "keep snapshots for N days, then delete them",
+and every backup product has one. The question for this phase is whether WP
+Debloat should.
+
+### Decision
+
+**No automatic expiry.** Snapshots and their spill files are kept until the user
+removes them, or until the plugin is uninstalled with cleanup enabled (Phase 15).
+`SnapshotStatus::EXPIRED` exists in the enum because §8 defines it, and nothing
+in the plugin sets it on a timer.
+
+### Consequences
+
+- A recovery point is the only route back from a change. Deleting one on a
+  schedule means deciding, on the user's behalf, when their site stopped being
+  worth recovering — and the decision would necessarily be made without knowing
+  whether the change had been noticed yet. Somebody who applies a tweak in March
+  and finds the broken page in June is exactly the person retention would have
+  failed.
+- The storage cost is bounded in practice: Level A snapshots are a few kilobytes,
+  and Level B ones exist only for data operations, which are rare and which the
+  user runs deliberately.
+- Consequently the plugin must never *rely* on old snapshots disappearing. The
+  restore path checks the site hash and the checksum on every restore, so an old
+  snapshot restored onto a site it did not come from is refused rather than
+  applied.
+- If a site does accumulate large recovery points, the answer is a visible list
+  with a delete action (Phase 8), not a silent sweep.
+
+---
+
+## D-0017 — The lock is what distinguishes a crashed run from a running one
+
+- **Phase:** 5
+- **Date:** 2026-09-03
+- **Status:** Accepted
+- **Spec:** §9.2
+
+### Context
+
+`BUILD-SPEC.md` §9.2 requires that "a run found in APPLYING/VERIFYING on next
+boot is auto-rolled-back and marked `INTERRUPTED`". Taken literally on every
+admin request, that rolls back the apply that is running *right now*, in another
+request, halfway through its work — which is a considerably worse outcome than
+the crash it is meant to recover from.
+
+### Decision
+
+Crash recovery runs on `admin_init`, after the schema check, and refuses to act
+while the apply lock is held by anyone. The lock has a 60-second TTL and is
+refreshed by a live apply; a process that died stops refreshing it, so within a
+minute the lock is gone and the run in `APPLYING` is unambiguously abandoned.
+Recovery then takes the lock itself for the duration of the rollback.
+
+### Consequences
+
+- A crashed run is recovered on the first admin page load more than a minute
+  later, rather than instantly. Nobody is waiting on it, and the site is in the
+  state the crash left it in either way.
+- No request ever rolls back another request's live work.
+- A rollback that itself fails leaves the run `INTERRUPTED` with the reason
+  recorded on it, rather than looping: the next boot finds it in `INTERRUPTED`,
+  which is not a crash-recoverable state.
+
+---
+
+## D-0018 — Every journalled transition comes from the transition table
+
+- **Phase:** 5
+- **Date:** 2026-09-03
+- **Status:** Accepted
+- **Spec:** §9.1
+
+### Context
+
+§9.1 ends with "every transition writes a journal row". The straightforward
+implementation is for each site of the apply to call
+`$journal->applied( $run_id, $id, FROM, TO )` with the states it believes are
+right. Writing the first draft that way immediately produced rows the state
+machine would have rejected — `APPLIED → ROLLED_BACK` and
+`COMMITTED → ROLLED_BACK`, neither of which is an edge in §9.1 — because the
+caller knew where the tweak should end up and not how it was supposed to get
+there.
+
+A journal that records transitions the machine forbids is worse than no journal:
+it reads as authoritative and is not.
+
+### Decision
+
+`Apply\TweakLifecycle` is the only thing that writes tweak transitions. Callers
+say where a tweak should end up; it asks `TweakStateMachine::pathTo()` for the
+shortest route the table permits, walks it one edge at a time through a real
+machine, journals each edge, and stores the final state. A target with no legal
+route is journalled as a skip and the stored state is left alone.
+
+### Consequences
+
+- `SNAPSHOTTED → ROLLED_BACK` is journalled as
+  `SNAPSHOTTED → APPLY_FAILED → ROLLED_BACK`, and undoing a committed tweak as
+  `COMMITTED → REVERT_REQUESTED → ROLLED_BACK`, which is what §9.1 says happens.
+- The journal is auditable against the table, and an integration test does
+  exactly that for every row it writes.
+- Adding a state to §9.1 changes the routes automatically; nothing has a
+  hard-coded edge to update.
