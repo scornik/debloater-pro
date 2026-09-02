@@ -1200,3 +1200,58 @@ the token proves it was the thing the user was shown.
 - `scan` counts as state-changing — it writes a run — so it needs the nonce too.
   A Phase 3 test that posted to it without one now sends one, and a new test
   asserts the refusal.
+
+---
+
+## D-0025 — What the Meter refuses to say
+
+- **Phase:** 9
+- **Date:** 2026-09-03
+- **Status:** Accepted
+- **Spec:** §12
+
+### Context
+
+§12 fixes the metric list and ends with four words that shape the whole
+implementation: "never reported as time saved". The interesting decisions are
+therefore about what the reporting layer must *not* do, because each of them is
+a way a plugin flatters itself and each is easy to write by accident.
+
+### Decision
+
+Four rules, each with a test that fails if it stops being true.
+
+1. **A metric that could not be measured has no value.** `Measurement` carries
+   `null` and a reason, never a zero. The naive implementation — start at 0, add
+   what you find — reports a site whose loopback is blocked as having gone from
+   forty requests to none, which would be the most flattering possible lie.
+2. **A missing "after" produces no delta.** Not a fall to zero, not an omission:
+   the row appears with "not measured" and the reason.
+3. **A metric that did not move is still reported.** A report that lists only
+   improvements is an advertisement.
+4. **No percentage from zero.** There is no honest percentage change from
+   nothing, and "infinite improvement" is not a number.
+
+Direction is reported as `down` / `up` / `unchanged`, not `better` / `worse`.
+Fewer requests is usually good; fewer scheduled events sometimes is not, and the
+comparison has no business deciding which.
+
+`frontend.*` metrics are summed across the pages §12 names — home, the newest
+content page, and the dashboard — because the metric is "what this site asks
+browsers to load", not "what one page does". Each reading records which pages it
+covered, so a before and an after taken over different pages cannot silently
+produce a delta.
+
+`admin_ajax_requests_per_hour` is the one derived metric, and it reports the
+interval and the number of administrators it used, so the arithmetic can be
+checked rather than trusted.
+
+### Consequences
+
+- Reports on well-behaved sites are less impressive than they could be, and are
+  true.
+- The dashboard's report shows the score before and after by scanning again
+  after the change. The score is derived from findings, so the only honest
+  "after" is a fresh look at the site rather than arithmetic on the old one.
+- No metric measures time, and none ever will: page-load time on somebody else's
+  host depends on their hosting, their network and their visitors.
