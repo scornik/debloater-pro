@@ -884,3 +884,119 @@ route is journalled as a skip and the stored state is left alone.
   exactly that for every row it writes.
 - Adding a state to §9.1 changes the routes automatically; nothing has a
   hard-coded edge to update.
+
+---
+
+## D-0019 — Which markers prove a page rendered
+
+- **Phase:** 6
+- **Date:** 2026-09-03
+- **Status:** Accepted
+- **Spec:** §11, §16
+
+### Context
+
+A probe has a status code and a blob of HTML. From those it has to answer "did
+this page render", and its answer decides whether the user's change is kept or
+undone. Both kinds of mistake are expensive: a marker that misses a broken page
+leaves a site broken, and a marker that fires on a working page rolls back a
+change that was fine.
+
+### Decision
+
+**Fatal markers** — any of these, matched case-insensitively as whole phrases,
+makes the probe FAIL whatever the status code says:
+
+- `Fatal error`
+- `Parse error`
+- `There has been a critical error`
+- `Error establishing a database connection`
+- `WP_Error Object`
+- `object(WP_Error)`
+
+**Render markers** — a page that is otherwise fine but lacks these is a WARN,
+not a FAIL:
+
+- `</html>` — the only genuinely universal proof that a whole document arrived.
+  A response truncated by a fatal with `display_errors` off cannot have one.
+- `<title` — present on essentially every real theme, but a theme is allowed to
+  be strange, so its absence warns rather than fails.
+
+**Dashboard markers** — `id="wpbody"` and `id="adminmenu"`, both required. They
+have been in core's admin markup for over a decade and are not theme-dependent,
+because the admin is not themed.
+
+**Login-form markers** — `id="loginform"` or `name="log"`. Used two ways: their
+presence on the login page is the proof it rendered, and their presence on
+`/wp-admin/` means the credential did not work, which is UNKNOWN rather than a
+verdict on the site.
+
+### Deviation from §11, deliberate
+
+§11 lists `WP_Error` among the fatal markers. Matched as a bare class name it
+fires on any page that merely mentions the class: a tutorial, a changelog, a
+release note, this plugin's own documentation pages. The consequence of that
+false positive is rolling back a change that was working perfectly, on a site
+whose only offence was writing about WordPress.
+
+What actually indicates a broken page is a `WP_Error` that has been **printed**,
+so the marker is the printed forms — `WP_Error Object` from `print_r()` and
+`object(WP_Error)` from `var_dump()`. The intent of §11 is preserved; only the
+false-positive surface is removed. A unit test asserts both that the printed
+forms are caught and that prose about `WP_Error` is not.
+
+### Consequences
+
+- Marker lists live in one class, `Verify\Markers`, rather than being spread
+  across six probes, so this decision is a diff of one file if it turns out to
+  be wrong.
+- The lists are conservative on the FAIL side and generous on the WARN side,
+  which matches the asymmetry of the outcomes: a warning costs a sentence in a
+  report, a failure costs the user their change.
+
+---
+
+## D-0020 — What happens when the site cannot reach itself
+
+- **Phase:** 6
+- **Date:** 2026-09-03
+- **Status:** Accepted
+- **Spec:** §11, §9.2
+
+### Context
+
+Verification is loopback HTTP: the site asking itself for its own pages. Plenty
+of hosts do not allow that — outbound requests blocked at the firewall, DNS that
+does not resolve the site's own name from inside, a container that cannot route
+back to itself. On those sites every probe fails identically, and for a reason
+that has nothing to do with the change just applied.
+
+Three responses were possible: treat it as a failure and roll back; treat it as
+a pass and commit quietly; or report it as unknown.
+
+### Decision
+
+**Every HTTP probe reports UNKNOWN, the aggregate becomes WARN, and the run ends
+`VERIFIED_WITH_WARNINGS` with the change kept and the user told plainly that the
+checks could not run.**
+
+Loopback is checked once, up front, by asking for the home page. If that fails,
+the remaining probes are not attempted at all: they would each spend fifteen
+seconds discovering the same thing, and a ninety-second verification that ends
+in "we could not tell" is worse than a one-second one.
+
+### Consequences
+
+- A blocked-loopback site still gets snapshots, rollback and the journal. What
+  it does not get is automatic verification, and it is told so rather than being
+  left to assume the checks passed.
+- Rolling back would have been the "safe-looking" choice and is in fact the
+  wrong one: it would undo good work because of a firewall rule, on every apply,
+  forever, on a site where nothing is wrong.
+- Committing silently would be worse still — the user would believe the site had
+  been checked.
+- `UNKNOWN` counting as a warning in the aggregate is what makes this work, and
+  it is why `UNKNOWN` and `NOT_TESTED` are separate statuses: "we could not
+  check" warns, "there was nothing to check" does not.
+- A probe that throws is also UNKNOWN, for the same reason: our bug is not
+  evidence about their site.
