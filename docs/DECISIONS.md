@@ -2236,3 +2236,165 @@ then does nothing is worse than one that fails to parse.
 - The CI workflow currently lives in this repository and runs against
   `registry/**` here. When the split happens it moves with the directory and
   gains the plugin as a second checkout.
+
+---
+
+## D-0046 — the public name, the wordpress.org slug, and where they may appear
+
+- **Phase:** 18
+- **Date:** 2026-09-03
+- **Status:** accepted
+- **Required by:** `BUILD-SPEC.md` §16 ("Phase 18: public name + wp.org slug")
+  and §17 Phase 18 ("apply them only through the Brand class and build config")
+
+### Context
+
+§16 lists this as a decision that has to be recorded rather than assumed, and
+until now it has been assumed: the name and the slug have been in `Brand` since
+Phase 0 and nothing has ever written them down as a decision.
+
+The slug is the part that cannot be changed later. It is the directory name, the
+text domain, the update-check key and the URL — and once a plugin is published,
+changing it is not a rename but a new plugin with none of the installs.
+
+### Decision
+
+**Public name:** WP Debloat
+**wordpress.org slug:** `wp-debloat`
+
+Both live in `src/Brand.php` and nowhere else:
+
+| Constant | Value | What it decides |
+|---|---|---|
+| `Brand::NAME` | `WP Debloat` | Plugin header, admin menu, readme title |
+| `Brand::SLUG` | `wp-debloat` | Directory, zip, npm package name, `Manifest::PRODUCT` |
+| `Brand::TEXT_DOMAIN` | `wp-debloat` | Every `__()` call, the POT filename |
+| `Brand::MENU_SLUG` | `wp-debloat` | `?page=` |
+| `Brand::PREFIX` | `wpdebloat` | Options, transients, tables, hooks |
+| `Brand::REST_NAMESPACE` | `wpdebloat/v1` | REST routes |
+| `Brand::CAPABILITY` | `wpdebloat_manage` | Permission checks |
+| `Brand::CLI_COMMAND` | `debloat` | `wp debloat …` |
+
+`ReleaseReadinessTest` holds this: the machine-readable identifiers appear
+exactly once in the codebase, in `Brand`, and the slug agrees with the entry
+filename, the npm package name and the POT filename.
+
+### Two deliberate exceptions
+
+**The text domain is a literal in every `__()` call.** It has to be. WordPress's
+string extractor reads source text rather than running it, so
+`__( 'x', Brand::TEXT_DOMAIN )` produces a POT entry with no domain and a
+translation nobody ever sees. The test therefore exempts the last argument of a
+gettext call, and asserts instead that every one of them is `wp-debloat` and
+none is anything else — which is the property that actually matters.
+
+**The product name appears inside sentences.** Roughly twenty findings say
+things like "WP Debloat will not deactivate or delete anything". Those were left
+as they are.
+
+The alternative is `sprintf( __( '%s will not deactivate or delete anything' ),
+Brand::NAME )`, and the argument for it is rebrandability. But no rebrand is
+planned, the strings are translatable copy rather than identifiers, and turning
+twenty sentences into placeholder templates to serve a hypothetical is the
+speculative abstraction `CLAUDE.md` rules out. The identifiers are the part
+where a stray literal is a silent bug — a mismatched option name looks exactly
+like a setting that will not save. A product name inside a sentence is a
+sentence somebody would have to rewrite anyway, in every locale, on the day a
+rebrand actually happens.
+
+`runtime-handlers/runtime-guard.php` carries one further literal: the capability
+name. A runtime handler has no autoloader by design (§10), so it cannot see
+`Brand` at all. `ReleaseReadinessTest` asserts its copy still equals
+`Brand::CAPABILITY`, which is the closest thing to a single definition that a
+file with no dependencies can have.
+
+### Consequences
+
+- The slug is now fixed. `wp-debloat` on wordpress.org, and nothing in the
+  codebase repeats it.
+- A rebrand means editing `Brand`, the plugin header, the readme title, and
+  about twenty translatable sentences. That is written down here so nobody has
+  to discover it.
+- The name is **not** reserved on wordpress.org. Reserving it means submitting
+  the plugin, which is an external act outside this build's boundary (see
+  D-0045 for the same reasoning about the registry repository).
+
+---
+
+## D-0047 — public name and slug: Debloater
+
+- **Phase:** 18a
+- **Date:** 2026-09-03
+- **Status:** accepted
+- **Supersedes:** D-0046, which recorded "WP Debloat" / `wp-debloat`
+- **Required by:** `BUILD-SPEC.md` §16 ("Phase 18: public name + wp.org slug")
+
+### Context
+
+D-0046 recorded the name the plugin had carried since Phase 0 and fixed the
+slug as `wp-debloat`. Preparing the wordpress.org submission showed that slug
+cannot be used.
+
+**"wp" is a restricted term.** wordpress.org's Readme Validator and Plugin Check
+reject a plugin name or slug that begins with — and, in the current wording,
+that contains — "wp". `WP Debloat` and `wp-debloat` both fail that check, so
+neither is submittable. This is not a warning to argue with: it is enforced at
+the point of review.
+
+**`debloat` is taken.** The bare slug belongs to an unrelated wordpress.org
+plugin that removes unused CSS. It is unused, but a taken slug is a taken slug.
+
+**The search demand is on the word "bloat".** That is the word people type, and
+it is the word the subtitle has to carry even though it cannot be the slug.
+
+**"WordPress" is permitted in a display name but not in a slug.** So the
+subtitle can say it and the identifier cannot.
+
+### Decision
+
+| | |
+|---|---|
+| **Display name** | Debloater – Scan, Fix & Undo WordPress Bloat |
+| **`Brand::NAME`** | `Debloater` |
+| **`Brand::TAGLINE`** | `Scan, Fix & Undo WordPress Bloat` |
+| **Slug** | `debloater` |
+| **Text domain** | `debloater` |
+
+`Brand::NAME` is the short name, because that is what belongs in a menu item, a
+sentence and an error message. The full title — name, en dash, tagline — is
+composed for the two places wordpress.org reads it: the plugin header and the
+readme title. `Brand::TAGLINE` exists so that composition happens in one place
+rather than being typed twice.
+
+The rename is a **full identifier rename**, not a display-only one: namespace,
+constants, prefixes, options, transients, database tables, capability, REST
+namespace, WP-CLI command, generated paths, the kill-switch query variable, the
+verification header, and the must-use loader filename.
+
+### Why a full rename is safe here, and would not be later
+
+There are zero production installs. Nothing anywhere has a
+`wp_wpdebloat_snapshots` table, a `wpdebloat_state` option or a
+`wp-content/wpdebloat/runtime.php` to migrate, so **no migration is written and
+none is needed**. `Storage\Schema` is edited directly.
+
+That window is closing. After the first release the same change would need a
+`dbDelta` rename, an option migration, a runtime regeneration and a fallback for
+sites that skip a version — which is precisely the reason to do it now rather
+than to discover the restricted term after publishing.
+
+### Consequences
+
+- The old identifiers are gone rather than aliased. There is no
+  `wp debloat` alias for `wp debloater`, and no back-compat constant. An alias
+  would be a compatibility promise made to nobody.
+- Tweak ids (`core.*`, `db.*`, `admin.*`, `woo.*`, `elementor.*`) are **not**
+  renamed. They are registry data that identifies a change, not brand — and they
+  are what a saved selection and every snapshot refer to.
+- The "Debloat Score" (§1, locked decision 1) keeps its name. It is the name of
+  a measure, it was not part of this brief, and renaming a locked architectural
+  term is not a rename task.
+- `docs/RENAME-MAP.md` records the mapping, one row per token, so the next
+  person can tell a brand rename from a coincidence.
+- The GitHub repository rename and the local working-directory rename are
+  external acts, done by a person outside this session.
