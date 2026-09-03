@@ -1615,3 +1615,93 @@ profile carries no parameters, and the whole question is which widgets.
   one at a time.
 - A future "Admin" profile, if one is ever wanted, would be a deliberate thing
   with its own name rather than these quietly joining `safe`.
+
+---
+
+## D-0033 — The asset scan reads a sample, and every fact says so
+
+- **Phase:** 13
+- **Date:** 2026-09-03
+- **Status:** Accepted
+- **Required by:** `BUILD-SPEC.md` §17 Phase 13
+
+### Context
+
+A site can have a hundred thousand URLs. §17 gives the asset scan ten seconds
+and a ceiling of ten requests, so it reads the home page plus the most recent
+entry of each public post type.
+
+That is a sound sample — the differences between pages follow post type far more
+than they follow individual posts — but it creates a way to be badly wrong. "No
+Contact Form 7 form on any page" is true of four pages and says nothing about
+the contact page, and a change made on that basis breaks exactly the page the
+plugin was installed for.
+
+### Decision
+
+The sample size is a fact, it travels with every other fact in the namespace,
+and the rules that read it say so in the words they show a person.
+
+- `assets.pages_sampled` is what was actually fetched; `assets.pages_offered` is
+  what the sample chose before fetching began. A gap between them means
+  something did not answer, or the budget ran out.
+- The Contact Form 7 finding is worded "Of N pages sampled…", never "on every
+  page", and its confidence is capped at 0.75 — the ceiling is the sample, not
+  the parsing, which is exact.
+- Phase 13 adds **no unloading tweaks at all**, which §17 already requires and
+  this makes a second reason for: acting on a sample is where the harm would be.
+
+### Consequences
+
+- A rule that wanted to say "this loads on every page" would need a different
+  fact, and there is not one. That is deliberate.
+- The asset scan checks loopback once and gives up if the site cannot reach
+  itself, rather than making ten requests that will each time out. It reports
+  `assets.available = false` with the reason, which a rule reads as "not
+  observed" rather than "nothing found".
+- There is a wall-clock budget across the whole asset scan, so a slow site
+  produces a smaller sample rather than a slower scan. The smaller sample is
+  visible in `pages_sampled`.
+
+---
+
+## D-0034 — "No outbound HTTP" was the wrong way to say it
+
+- **Phase:** 13
+- **Date:** 2026-09-03
+- **Status:** Accepted
+- **Supersedes:** the assertions written for Phase 11
+- **Required by:** `BUILD-SPEC.md` §13 rule 9
+
+### Context
+
+Phase 11 added tests asserting that a scan makes **zero** HTTP requests. They
+passed, and they were checking the wrong thing. §13 rule 9 has always allowed
+loopback; what it forbids is traffic leaving the server. The zero-request
+assertion happened to be equivalent only because nothing had needed loopback
+yet.
+
+Phase 13 needed it, and four tests failed for a change that was entirely within
+the rule they were meant to be defending.
+
+### Decision
+
+The assertions now state the promise that is actually being made: **nothing
+leaves this server** unless the user asked for it on that action. Every request
+URL must start with the site's own home URL.
+
+This is not a weakened test. It is a stricter one, because it keeps holding
+however many loopback requests a later phase adds, and because it would still
+fail on the thing that actually matters — a request to a host that is not this
+site.
+
+The one exception stays explicit: with `--check-plugin-updates`, requests to
+`api.wordpress.org` are allowed, and a test asserts that every off-site request
+goes there and nowhere else.
+
+### Consequences
+
+- A test that passes for an accidental reason is worth less than it looks, and
+  the way to find out is to change something legitimate and see what breaks.
+- Later phases that add loopback traffic — asset fetching, probes — will not
+  need to renegotiate this.
