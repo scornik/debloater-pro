@@ -1988,3 +1988,105 @@ someone who can edit it. What matters is what a customer gets.
   `UNKNOWN`, because a probe that does not apply was never going to run. It now
   asserts that no probe reaches a verdict and that every probe which does apply
   is `UNKNOWN` — which is the claim that was always meant.
+
+---
+
+## D-0041 — The REST root carries no namespace
+
+- **Phase:** 16 (the bug it fixes was shipped in Phase 8)
+- **Date:** 2026-09-03
+- **Status:** Accepted
+- **Severity:** the admin screen did not work at all on a default WordPress
+
+### Context
+
+`Screen::bootstrapData()` handed the admin bundle
+`rest_url( 'wpdebloat/v1' )` as its API root, and `client.js` joined paths like
+`/status` onto it.
+
+On a site with **pretty permalinks** that produces
+`…/wp-json/wpdebloat/v1//status` — a double slash WordPress tolerates. On a site
+with **plain permalinks**, which is WordPress's default, `rest_url()` returns
+`…/index.php?rest_route=/wpdebloat/v1`, and the same join produces a query
+string that matches no route at all.
+
+Every screen showed "No route was found matching the URL and request method."
+The plugin was unusable on a default install, and had been since Phase 8.
+
+**Nothing caught it.** 1 140 unit tests and 246 integration tests, including a
+whole file of REST route tests, all build a `WP_REST_Request` by hand and
+dispatch it. Not one of them ever composed a URL. The first thing to notice was
+a browser opening the page in Phase 16 — which is the entire argument for this
+phase existing.
+
+### Decision
+
+The bootstrap hands over a **bare** root and the namespace separately. The
+client joins them, once, in one place.
+
+`@wordpress/api-fetch`'s root middleware already knows how to join a path onto a
+query-string root — it turns a `?` in the path into `&` and strips the leading
+slash. It just has to be given a root it can do that with.
+
+### Consequences
+
+- `RestUrlTest` composes the URL exactly as the client does, parses it with
+  `WP_REST_Request::from_url()` and dispatches it, **under both permalink
+  structures**. It fails on the pre-fix code with three failures and passes on
+  the fix; that was checked by reverting.
+- The general lesson is recorded here because it will recur: a test that
+  constructs the object under test by hand cannot find a bug in how that object
+  is addressed. Dispatching a `WP_REST_Request` proves the route works. It says
+  nothing about whether anything can reach it.
+
+---
+
+## D-0042 — The end-to-end suite drives the site it is testing
+
+- **Phase:** 16
+- **Date:** 2026-09-03
+- **Status:** Accepted
+- **Required by:** `BUILD-SPEC.md` §14, §17 Phase 16
+
+### Context
+
+The scenarios need a site with WooCommerce, Elementor and Contact Form 7 on it,
+a product to buy and a form to submit. wp-env's *development* environment
+already carries the stack; nothing carried the content.
+
+They also need to drive changes: apply, roll back, force a probe failure. Some
+of that is only reachable through WP-CLI.
+
+### Decision
+
+- `tools/seed-e2e.php` creates a purchasable product, a page carrying a Contact
+  Form 7 form, and a page with a saved Elementor design. It refuses to run
+  outside a local environment.
+- The suite talks to the site through the browser for anything a person would
+  do, and through WP-CLI for the things a browser cannot see — the stored
+  runtime hash, whether the lock is held, what a rollback restored.
+- WP-CLI exit codes are listed rather than ignored. `wp debloat apply` returns
+  **3** when it applied but could not verify, which is what happens on any site
+  that cannot reach itself over HTTP — and wp-env is exactly such a site
+  (D-0009). Allowing 0 and 3 for an apply is accurate; allowing anything would
+  have hidden the failures this suite exists to catch.
+
+### Two things the fixtures taught us
+
+**A fresh WooCommerce is not open.** WooCommerce ships with "coming soon" mode
+on, which serves every visitor a launch page. The first version of the checkout
+scenario asserted the cart page did *not* say "your cart is empty" — which was
+true of the launch placeholder too. It passed while measuring nothing. The
+assertion is now positive: the product must be named on the page.
+
+**A block theme has no `form.cart`.** The fixture site runs Twenty Twenty-Five,
+where add-to-cart is a block whose markup varies with the template. The scenario
+uses WooCommerce's own `?add-to-cart=` URL — which is what the button does — so
+it tests the cart and the checkout rather than the theme's choice of element.
+
+### Consequences
+
+- Nothing from this phase ships. `tests/E2E` is a development directory, and a
+  repository invariant already asserts that no shipped file references it.
+- `wp debloat verify --e2e` prints how to run the suite rather than trying to,
+  because the suite is not in the package a person installs.
