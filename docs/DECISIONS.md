@@ -2398,3 +2398,85 @@ than to discover the restricted term after publishing.
   person can tell a brand rename from a coincidence.
 - The GitHub repository rename and the local working-directory rename are
   external acts, done by a person outside this session.
+
+---
+
+## D-0048 — what Plugin Check is allowed to be told, and what it is not
+
+- **Phase:** 18
+- **Date:** 2026-09-03
+- **Status:** accepted
+- **Required by:** `BUILD-SPEC.md` §17 Phase 18 ("make the Plugin Check report
+  clean")
+
+### Context
+
+Run against what actually ships, Plugin Check reported **407 findings**. Taking
+that from 407 to nothing could be done two ways, and only one of them is worth
+doing.
+
+The first run also reported 439 errors that were entirely an artefact of
+pointing it at the working directory: `.git`, `node_modules`, a PHPUnit phar.
+Plugin Check must be run against the staged tree `npm run plugin-zip` produces,
+never against the repository. That is now how it is run, and it is worth
+writing down because the wrong way looks like it is working.
+
+### Decision
+
+Findings were sorted into three piles, and each pile was handled differently.
+
+**1. Real defects. Fixed.**
+
+| Finding | What it actually was |
+|---|---|
+| `Generic.PHP.ForbiddenFunctions` (`proc_open`) | `RuntimeWriter::lint()` shelled out to `php -l` as a second syntax check. `token_get_all( $source, TOKEN_PARSE )` — already running one line above — runs the real parser and catches every case `php -l` does. Worse, `proc_open` is disabled on much shared hosting, so on exactly the hosts where a corrupt runtime is hardest to recover from, the "safety net" had been silently doing nothing. Removed. |
+| `EscapeOutput.ExceptionNotEscaped` (326) | Chasing this found two genuine holes. `src/Rest/` had **no `try`/`catch` anywhere**, and WordPress does not catch exceptions from a route callback — so any engine throw was a PHP fatal on a REST request. And `recoverOnBoot()` ran on `admin_init` with nothing around it, so a throw during crash recovery would fatal every wp-admin page, locking somebody out of the only screen that could fix it. Both fixed. |
+| `UnescapedDBParameter` (30 → 0 in the repositories) | Table names were interpolated into SQL. WordPress 6.2 added the `%i` identifier placeholder and this plugin requires 6.5, so the table name now goes through `prepare()` like everything else. Twenty call sites converted; the 278-test integration suite runs every one of them against real tables. |
+| `hidden_files` (9) | `.gitkeep` markers were shipping inside `src/`. The zip builder now excludes dotfiles outright. |
+| `missing_composer_json_file` | The zip carried `vendor/` with no `composer.json` beside it. Now ships. |
+| `outdated_tested_upto_header` | `Tested up to: 6.8`, while the suite runs against 7.1. Corrected to what is actually tested. |
+
+**2. False for this architecture. Annotated, with the reason and a test.**
+
+Some sniffs assume a plugin shape this one deliberately does not have. Each is
+suppressed with a named sniff code and a reason that says what makes it false —
+never a blanket `phpcs:disable` and never a silent one.
+
+- `ExceptionNotEscaped`, in 46 files. Escaping at the throw sites would put
+  `esc_html()` inside `src/Contracts/` and `src/Registry/`, which a repository
+  invariant forbids from calling WordPress at all. §13 rule 4 says escaping
+  happens **at the edge**, and it now does:
+  `Rest\Controller::guard()` escapes every `Throwable`, `Cli\Command` catches at
+  the CLI edge, and `tests/Integration/ExceptionBoundaryTest.php` holds both.
+  The annotation points at that test, so the claim is checkable rather than
+  asserted.
+- `AlternativeFunctions.*` — `WP_Filesystem` cannot do an atomic replace, and it
+  prompts for FTP credentials in the middle of an apply. §10.
+- `error_log_var_export` — `var_export()` here is the code generator, and §13
+  rule 5 names it specifically.
+- `slow_db_query_meta_key` — finding orphaned meta *is* querying by `meta_key`.
+- `Offloading.OffloadedContent` — the URL is matched so the script that loads it
+  can be removed. Nothing fetches it.
+
+**3. Not ours to decide. Left, and reported.**
+
+Two `trademarked_term` warnings on the display title
+"Debloater – Scan, Fix & Undo WordPress Bloat": Plugin Check says "wordpress"
+"cannot be used at all in your plugin name". `Debloater` and `debloater` are
+both clean; only the tagline draws it. The title was chosen deliberately for
+search, so it stands until somebody decides otherwise (see D-0047).
+
+### Result
+
+**407 findings → 2 warnings, 0 errors.** The two are the naming decision above.
+
+### Consequences
+
+- Plugin Check is run against `dist/debloater`, not the repository.
+  `npm run plugin-check` does the former.
+- One thing worth remembering: `wp_json_encode()` does **not** escape `<` or
+  `>`. The REST boundary was written assuming it did, and a test caught the
+  assumption. The boundary escapes explicitly now.
+- A suppressed sniff that later becomes true in a file will stay suppressed.
+  That is the cost of a file-level disable, and it is why each one names
+  specific sniff codes rather than a whole standard.
