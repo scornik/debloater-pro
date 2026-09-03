@@ -1868,3 +1868,123 @@ supported switch, use the switch; where it does not, report and stop.
   shipped tweak with a fact predicate — which changed what
   `DependencyResolverTest` could assert, since a fact-gated tweak is correctly
   held back until there is a scan (§7.4).
+
+---
+
+## D-0038 — One page fetch, several readers
+
+- **Phase:** 15
+- **Date:** 2026-09-03
+- **Status:** Accepted
+- **Required by:** `BUILD-SPEC.md` §13 rule 9, §17 Phases 13 and 15
+
+### Context
+
+Phase 13 gave the asset scan its own page fetching. Phase 15 needs the same
+rendered pages to work out which of them are WooCommerce pages — and scanners
+are deliberately isolated: each gets a fresh `FactSet` and cannot read another's
+facts.
+
+Left alone, the WooCommerce scanner would have fetched all ten pages again,
+doubling a scan's loopback traffic to learn nothing new, and the two scanners
+could have disagreed about the same site because they looked at it at slightly
+different moments.
+
+### Decision
+
+`SampledPages` fetches once and lends the bodies to every scanner that needs
+them. Both the asset scanner and the WooCommerce scanner take it.
+
+Freshness is enforced rather than hoped for: `AbstractScanner::reset()` is a new
+lifecycle hook, `ScanRunner` calls it before each scanner runs, and the scanners
+that hold a sample forward it to `SampledPages::forget()`. A scan answered with
+pages fetched during a previous one would not be an observation of this site now,
+and the whole product rests on facts being observations.
+
+### Consequences
+
+- The wall-clock budget and the loopback check moved from `AssetScanner` to
+  `SampledPages`, where they belong: they were always about the fetch rather
+  than about assets.
+- A third scanner that needs rendered pages costs nothing extra.
+- `reset()` defaults to doing nothing, so a scanner that reads the site fresh
+  each time — which is almost all of them — is unaffected.
+
+---
+
+## D-0039 — A mini-cart is a refusal, not a warning
+
+- **Phase:** 15
+- **Date:** 2026-09-03
+- **Status:** Accepted
+- **Required by:** `BUILD-SPEC.md` §17 Phase 15, §6 locked decision #6
+
+### Context
+
+`woo.cart_fragments_conditional` is the highest-value change in the registry and
+the one most likely to be confidently wrong. WooCommerce's cart-fragments script
+makes an uncached admin-ajax request on every page load; on a blog post that is
+pure waste.
+
+Unless the theme shows a cart total in its header, which most shop themes do. On
+such a site the fragments are what keep that total correct, and making them
+conditional leaves a number that never changes until the visitor reloads. It
+looks like the shop is broken, and it is the sort of fault a shop owner
+discovers from a customer.
+
+### Decision
+
+A mini-cart anywhere off the shop makes this finding `dont_touch`, in
+`DontTouchRules`, alongside the Heartbeat refusal from Phase 3.
+
+Not a confidence penalty and not a warning. There is no version of "apply it and
+see" that is acceptable on a store, and a warning is something a person can
+click past while thinking about something else.
+
+The refusal names the pages it found a cart on, so it can be checked rather than
+believed.
+
+### Consequences
+
+- The detection is deliberately generous: a shopping-cart widget class, a
+  mini-cart block, a cart-contents element, a cart menu item. A false refusal
+  costs a saved request; a false recommendation costs a broken shop.
+- Two tests hold the balance: a mini-cart produces the refusal, and a site
+  without one still gets the recommendation. A refusal that fired everywhere
+  would be as useless as one that never fired.
+
+---
+
+## D-0040 — Every WooCommerce change is verified against cart, checkout and account
+
+- **Phase:** 15
+- **Date:** 2026-09-03
+- **Status:** Accepted
+- **Required by:** `BUILD-SPEC.md` §11, §17 Phase 15
+
+### Context
+
+Everything WP Debloat does to a store is worth less than one broken checkout.
+
+### Decision
+
+Three probes — `woo_cart`, `woo_checkout`, `woo_account` — fetch WooCommerce's
+own pages **as a guest** and assert the markup that makes them work is present.
+Both front-end WooCommerce tweaks list all three, so a change that breaks any of
+them fails verification and is rolled back rather than committed. A test asserts
+that every front-end Woo tweak names all three, so a future one cannot ship
+without them.
+
+As a guest, deliberately: an administrator sees a different page — caching
+behaves differently, notices appear, some themes render a shop differently for
+someone who can edit it. What matters is what a customer gets.
+
+### Consequences
+
+- A store with no cart, checkout or account page reports `NOT_TESTED` rather
+  than a pass. There was nothing to check, and claiming a pass would be claiming
+  to have checked.
+- The blocked-loopback test had to stop asserting that *every* probe reports
+  `UNKNOWN`, because a probe that does not apply was never going to run. It now
+  asserts that no probe reaches a verdict and that every probe which does apply
+  is `UNKNOWN` — which is the claim that was always meant.
