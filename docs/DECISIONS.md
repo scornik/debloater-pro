@@ -1705,3 +1705,88 @@ goes there and nowhere else.
   the way to find out is to change something legitimate and see what breaks.
 - Later phases that add loopback traffic — asset fetching, probes — will not
   need to renegotiate this.
+
+---
+
+## D-0035 — Licensing is provider-agnostic; Hakeemify Cloud is optional
+
+- **Phase:** 14 (architecture; implemented in Phases 17 and 19)
+- **Date:** 2026-09-03
+- **Status:** Accepted
+- **Supersedes:** the v0.4.2 amendment's requirement that
+  `cloud.hakeemify.com` host a WP Debloat licensing service, and the earlier
+  multi-subdomain topology it in turn superseded.
+
+### Context
+
+Two architecture instructions arrived in quick succession. The first replaced a
+four-subdomain topology (`license.`, `api.`, `registry.`, `app.`) with a single
+`cloud.hakeemify.com` carrying versioned paths, including a licensing service.
+The second superseded the licensing half of that: Pro licensing goes to a
+third-party platform (Freemius), and Hakeemify Cloud becomes an optional service
+layer rather than the licensing authority.
+
+Neither had been implemented when the second arrived. The repository contained
+no host, no licensing code and no entitlement code of any kind — the only
+`hakeemify.com` strings anywhere are JSON Schema `$id` identifiers, which are
+names rather than addresses and are never fetched. So this is recorded as a
+decision taken before the code, not as a migration.
+
+### Decision
+
+> WP Debloat Pro licensing is provider-agnostic and initially integrates with a
+> third-party licensing platform such as Freemius. Hakeemify Cloud is an
+> optional substantive service layer and is not the mandatory licensing
+> authority.
+
+> Where Hakeemify Cloud is used, it is one public hostname,
+> `cloud.hakeemify.com`, with versioned, product-scoped path namespaces. DNS
+> separation is intentionally minimized; security and data separation are
+> enforced at the application and service boundary.
+
+Concretely, and written into `BUILD-SPEC.md` §13 rules 13–15 and §17 Phases 17,
+19 and 20:
+
+- Entitlement is read through an `EntitlementProvider` interface, first
+  implemented by a `FreemiusEntitlementProvider`. No Freemius symbol appears
+  outside that adapter; no feature asks anything but the interface.
+- Any server-backed feature goes through a `CloudServiceClient` interface whose
+  `HakeemifyCloudClient` resolves every path from one base under
+  `/v1/wp-debloat/`. There is no second host.
+- A cloud endpoint whose real purpose is license validation is prohibited. The
+  cloud earns its existence with work that cannot be done locally, or it does
+  not exist.
+- No private key, payment secret or global API secret is ever in a distributed
+  package. Free WP Debloat works with no Pro, no licensing platform and no
+  cloud; a cloud outage is never destructive; security fixes are never
+  license-gated.
+
+### Why the interfaces are not being written yet
+
+Phase 14 is intelligence. Creating `EntitlementProvider` and
+`CloudServiceClient` now would put five empty files in the tree that nothing
+implements and nothing calls, which `CLAUDE.md` names specifically as something
+not to do. The boundary is a real requirement, so it is recorded where
+requirements live — the specification, as an exit criterion of Phase 19 — and it
+will be built when there is a Pro plugin to build it into.
+
+What *is* enforced from today is the part that can rot silently: a repository
+invariant asserting that no distributed code depends on any of the superseded
+hosts, that a cloud host never appears as a hard-coded string outside a resolver,
+and that no private key or API secret is in the package. Those are the failures
+that would be expensive to discover late, and they cost nothing to check now.
+
+### Consequences
+
+- Phase 17's registry fetch resolves from one pinned origin through one
+  resolver, and keeps every existing protection: canonical serialization,
+  SHA-256 per file, Ed25519 over the manifest, a pinned public key, schema
+  validation, and no executable content ever.
+- Phase 19 owns the entitlement and cloud adapters, their fixtures, and the
+  tests for expiry, revocation, offline grace, malformed responses, backoff and
+  fail-safe behaviour. Those tests are listed there rather than written here,
+  because a test for code that does not exist is a test that passes for no
+  reason — the thing Phase 13 had just finished removing (see D-0034).
+- The four superseded hosts are named in one place, the invariant test, so that
+  documentation describing the old topology stays readable as history without
+  becoming a live dependency.
