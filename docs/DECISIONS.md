@@ -2480,3 +2480,165 @@ search, so it stands until somebody decides otherwise (see D-0047).
 - A suppressed sniff that later becomes true in a file will stay suppressed.
   That is the cost of a file-level disable, and it is why each one names
   specific sniff codes rather than a whole standard.
+
+---
+
+## D-0049 — no PDF library in the white-label report
+
+- **Phase:** 19
+- **Date:** 2026-09-04
+- **Status:** accepted
+- **Required by:** `BUILD-SPEC.md` §17 Phase 19 — "print-CSS HTML first; server PDF
+  only if bundled lib size is acceptable"
+
+### Context
+
+The spec left this open on purpose, with a size condition attached. The
+condition decides it.
+
+The smallest PHP library that renders usable PDF from HTML is several megabytes
+of vendored code. The entire free plugin zip is 522 KB, and the plugin's whole
+argument is that it removes weight from a site rather than adding it. Bundling
+ten times the plugin's own size so that a browser does not have to be asked to
+print is not a trade this product can make and still mean what it says.
+
+There is a second cost that is not about bytes. A PDF library is a large
+attacker surface that parses untrusted-ish input, and it is the kind of
+dependency that needs watching for CVEs forever. This plugin ships **zero**
+runtime Composer dependencies (§3), and the first one should not be one nobody
+asked for.
+
+### Decision
+
+**HTML with print CSS. No PDF library, now or as a Pro-only extra.**
+
+The report is a page: the browser's own print dialogue produces a PDF, on every
+platform, with the client's own margins and paper size, and with no library to
+keep patched. The CSS is inline and about ten lines, because the page is opened,
+printed and closed.
+
+### Consequences
+
+- "Export as PDF" is Ctrl-P. If that turns out to be a real objection from real
+  agencies rather than an assumed one, the cloud is the place for it — rendering
+  server-side through `CloudServiceClient` costs the site nothing and keeps the
+  library off it — and that is a Phase 20 conversation, not this one.
+- The report contains only measured deltas (§12 invariant 14). White-label means
+  the agency's name replaces Hakeemify's; it does not mean the numbers change,
+  and where nothing was measured the report says so rather than estimating.
+
+---
+
+## D-0050 — how Pro attaches to the free plugin
+
+- **Phase:** 19
+- **Date:** 2026-09-04
+- **Status:** accepted
+- **Required by:** `BUILD-SPEC.md` §17 Phase 19, §13 rules 13, 14 and 15
+
+### Context
+
+Pro has to reach the engine to be useful and must not become part of it. Three
+ways to arrange that, and only one of them survives contact with the exit
+criterion "Pro adds no tweaks and no safety features".
+
+**Bundle Pro inside the free plugin, gated on a licence check.** Rejected. It
+puts commercial code in a GPL upload nobody reviewed, and it makes the free
+plugin's behaviour depend on a licence answer — which is how a safety feature
+ends up one refactor away from being paywalled.
+
+**Give Pro direct access to the engine's classes.** Rejected. It works
+immediately and rots immediately: every internal becomes a public API by
+accident, and the first refactor of the resolver breaks a paying customer's
+site.
+
+**Documented hooks, and nothing else.** Chosen.
+
+### Decision
+
+Five extension points, all in `docs/HOOKS.md`, all tested by
+`tests/Integration/ExtensionPointsTest.php`:
+
+| Hook | Kind | For |
+|---|---|---|
+| `debloater_loaded` | action | The entry point. Hands over `Plugin`. |
+| `debloater_scan_complete` | action | Drift detection |
+| `debloater_apply_complete` | action | Reporting, including on rollbacks |
+| `debloater_dashboard_panels` | filter | Text panels on our screen |
+| `debloater_registry_origin` | filter | The priority channel |
+
+The asymmetry is the design. `debloater_loaded` passes the whole plugin, and
+every accessor on it is a getter — an extension can read the resolver, the risk
+engine and the snapshot manager, and can replace none of them. There is no hook
+to register a tweak, alter a plan, skip a recovery point or change a risk level,
+and their absence is the point rather than an oversight.
+
+`debloater_dashboard_panels` accepts **text**, not markup, and strips tags
+before the payload is written. An extension that needs an interface of its own
+needs a screen of its own, where it is responsible for its own escaping.
+
+`debloater_registry_origin` can move the channel and cannot relax it: a base
+`RegistryOrigin` refuses is a base nothing fetches from, an unusable value falls
+back to the shipped origin rather than switching updates off, and the manifest
+still faces the same signature check either way.
+
+### Consequences
+
+- The free plugin never names a Pro class. `ReleaseReadinessTest` asserts it, so
+  the free plugin stays readable and releasable without reference to Pro.
+- A new extension point needs, in one commit: the hook, its entry in
+  `docs/HOOKS.md`, and a test. A hook without a test is a promise nobody is
+  keeping.
+- Pro lives in `pro/`, is never in the free zip's allow-list, and carries its own
+  hand-written autoloader so it adds no dependency either.
+
+---
+
+## D-0051 — entitlement caching, and a bounded offline grace
+
+- **Phase:** 19
+- **Date:** 2026-09-04
+- **Status:** accepted
+- **Required by:** `BUILD-SPEC.md` §17 Phase 19 — "cached, offline-tolerant
+  results"
+
+### Context
+
+Two failures look identical from inside the plugin: a site that is not entitled,
+and a site whose licensing platform cannot be reached. Both arrive as "nothing
+unlocked". Deciding what to do about that is deciding who absorbs a third
+party's downtime.
+
+### Decision
+
+`CachedEntitlementProvider` wraps any provider. A good answer is cached until it
+expires. When the wrapped provider then comes back empty, the last good answer
+is honoured for a further **14 days** and no longer.
+
+The grace applies **only to a previously good answer**. There is no path from
+"never had an entitlement" to "has one", however many times a provider fails.
+
+### Why that way round
+
+Between "somebody who has paid briefly keeps what they bought" and "somebody who
+has paid is locked out because a third party had an outage", the first is the
+smaller wrong — and it is the one that does not generate a support ticket
+blaming this plugin for somebody else's afternoon.
+
+Fourteen days is long enough to cover an outage, a host blocking outbound HTTP,
+and a card that needed reissuing. It is not long enough to be a way of not
+paying: the window is finite, it does not renew on failure, and once it passes
+the answer is empty like any other.
+
+None of this is a security boundary, and it is not trying to be. Somebody
+determined can edit PHP on their own server. Pretending otherwise is what leads
+to the things the architecture brief rules out — encryption, ionCube,
+anti-debugging traps, destructive anti-tamper. This exists to tell an honest
+site what it has paid for.
+
+### Consequences
+
+- A licensing outage never stops a site scanning, applying, verifying or rolling
+  back. None of those is what was paid for, and none is gated.
+- The cached option is **not autoloaded**, matching the free plugin's rule: it
+  is read on admin requests and by cron, never on a front-end page view.
