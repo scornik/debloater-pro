@@ -1515,3 +1515,103 @@ keeping.
 - Tables hold identifiers and names only. What running two page caches costs is
   reasoning, and reasoning lives in the analyzer — the registry says what a
   plugin *is*.
+
+---
+
+## D-0031 — WP Debloat cannot tell promotion from warning, so it says so
+
+- **Phase:** 12
+- **Date:** 2026-09-03
+- **Status:** Accepted
+- **Required by:** `BUILD-SPEC.md` §17 Phase 12
+
+### Context
+
+§17 Phase 12 asks for `admin.suppress_promo_notices`, driven by an allowlist of
+"third-party notice hooks" for WooCommerce, Elementor, Yoast, Rank Math and
+Jetpack. The intent is clear and worth having: these plugins interrupt every
+admin screen, and a lot of it is marketing.
+
+The problem is that they do not separate the two. WooCommerce's `admin_notices`
+callbacks carry both an upsell and "your database needs updating". Yoast routes
+most of what it says through one notification centre. There is no hook, filter
+or flag that reliably says "this one is an advert", and building the feature as
+though there were would mean hiding a database-update warning and calling it
+promotional.
+
+Two ways to be dishonest were available: ship a filter list guessed from
+plausible-looking names, or ship the feature under a title that implies a
+precision it does not have.
+
+### Decision
+
+Ship the tweak with the id §17 gives it, and make everything a person reads
+accurate.
+
+- The **title** is "Hide admin notices from plugins you choose", not "Hide
+  promotional notices".
+- The **description** says it does not tell marketing from warnings and why.
+- `breaks` names what will be missed: pending database updates, expiring
+  licences.
+- The **risk is medium**, which keeps it out of "Fix Safe Issues" entirely.
+  Hiding another plugin's warnings is not something one click decides.
+- Selection is **per vendor**, so nothing is hidden that a person did not
+  choose after reading the above.
+- The allowlist entry for each vendor carries its own `notes` saying what that
+  particular plugin sends down the channel, and those notes are shown rather
+  than filed.
+
+The mechanism is source-based rather than hook-name-based: a notice callback is
+removed only when the file it is defined in lives inside one of the plugin
+directories the entry names. That needs no guesswork about internal APIs, cannot
+be used to silence a plugin the user did not select, and fails safe — a callback
+that cannot be attributed is left alone, because leaving a notice showing is the
+better error.
+
+### Consequences
+
+- `registry/admin-notices.json` is an allowlist, and the tweak's parameter
+  schema takes its `enum` from that file's source directories. A slug outside it
+  is refused by schema validation before it can reach generated code (§13
+  rule 5), which is asserted directly.
+- The rule offers this only when three or more notices come from allowlisted
+  plugins that are actually printing on this site, so it never proposes
+  silencing something silent.
+- If a vendor later publishes a real "no marketing" filter, that is a better
+  mechanism and the entry should move to it. The registry shape allows for that
+  without changing the tweak.
+
+---
+
+## D-0032 — Admin tweaks are not in any profile
+
+- **Phase:** 12
+- **Date:** 2026-09-03
+- **Status:** Accepted
+- **Required by:** `BUILD-SPEC.md` §7.4
+
+### Context
+
+Four of the five Phase 12 tweaks are `safe` and fully reversible, which would
+normally make them candidates for the safe profile and therefore for "Fix Safe
+Issues".
+
+### Decision
+
+None of them is in any profile. They are selected individually or not at all.
+
+"Safe" in §7.4 means the change cannot break the site. These cannot. But "Fix
+Safe Issues" is one click, and the person clicking it is not necessarily the
+only person who uses the admin. Removing a widget from a shared dashboard, or
+changing what an editor sees when they log in, is a change to somebody else's
+working day, and it should be chosen rather than swept up.
+
+`admin.remove_dashboard_widgets` could not be in a profile in any case: a
+profile carries no parameters, and the whole question is which widgets.
+
+### Consequences
+
+- The tweaks are offered on the findings screen with their evidence, and picked
+  one at a time.
+- A future "Admin" profile, if one is ever wanted, would be a deliberate thing
+  with its own name rather than these quietly joining `safe`.
