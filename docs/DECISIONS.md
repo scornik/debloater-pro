@@ -1790,3 +1790,81 @@ that would be expensive to discover late, and they cost nothing to check now.
 - The four superseded hosts are named in one place, the invariant test, so that
   documentation describing the old topology stays readable as history without
   becoming a live dependency.
+
+---
+
+## D-0036 — Widget attribution by reflection, not by a list of addons
+
+- **Phase:** 14
+- **Date:** 2026-09-03
+- **Status:** Accepted
+- **Required by:** `BUILD-SPEC.md` §17 Phase 14
+
+### Context
+
+§17 Phase 14 asks for Elementor addon packs to be detected "from
+registry/detectors" — the same mechanism the compatibility layer uses for
+WooCommerce, Yoast and the rest.
+
+There are hundreds of Elementor addon packs and new ones every month. A detector
+list would cover the dozen anybody thought of, report the rest as absent, and
+give a site running two unlisted packs an audit that quietly attributed their
+widgets to nobody.
+
+### Decision
+
+Attribution is by asking where the widget's class is defined, through the
+`Sources` helper Phase 12 already needed for admin callbacks and Phase 13 for
+asset URLs. A widget belongs to whichever plugin directory its code lives in.
+
+This covers every addon that exists, including ones nobody has heard of, and it
+needs no maintenance. `elementor` and `elementor-pro` keep their detectors —
+those are used for compatibility rules and for the fact predicate that gates the
+Google Fonts tweak — but the pack list is derived rather than enumerated.
+
+### Consequences
+
+- A widget whose class cannot be reflected reports `unknown`, which is a real
+  answer and shows up as its own pack in the audit.
+- The three-phase pattern is now a shared helper rather than three
+  implementations: `AdminSources` became `Sources` in Phase 13 for exactly this
+  reason.
+
+---
+
+## D-0037 — The only Elementor tweak is one Elementor supports
+
+- **Phase:** 14
+- **Date:** 2026-09-03
+- **Status:** Accepted
+- **Required by:** `BUILD-SPEC.md` §17 Phase 14
+
+### Context
+
+The obvious tweak this phase could ship is "unregister the widgets you do not
+use". It is what the audit's numbers make a person want, and it is the reason
+§17 says **never disable widgets automatically**.
+
+### Decision
+
+One tweak: `elementor.disable_google_fonts`, which answers
+`elementor/frontend/print_google_fonts` — a filter Elementor documents and
+supports — with false. Medium risk, because the site's typeface visibly changes,
+and the `breaks` list says so.
+
+Nothing unregisters a widget. Elementor has no supported way to remove another
+plugin's widget type, and doing it unsupported breaks the editor for every page
+already built with one: the design loads, the widget is missing, and the content
+is gone from the page the next time anybody saves it. That is unrecoverable from
+inside WP Debloat, and no measured saving justifies it.
+
+The general rule this sets, for Phase 15 and after: where a plugin exposes a
+supported switch, use the switch; where it does not, report and stop.
+
+### Consequences
+
+- The audit is `info` with no recommendation, permanently.
+- The tweak carries `fact:plugins.detected.elementor=true`, making it the first
+  shipped tweak with a fact predicate — which changed what
+  `DependencyResolverTest` could assert, since a fact-gated tweak is correctly
+  held back until there is a scan (§7.4).
