@@ -2090,3 +2090,149 @@ it tests the cart and the checkout rather than the theme's choice of element.
   repository invariant already asserts that no shipped file references it.
 - `wp debloat verify --e2e` prints how to run the suite rather than trying to,
   because the suite is not in the package a person installs.
+
+---
+
+## D-0043 — A registry release is a signed manifest, and everything else is a refusal
+
+- **Phase:** 17
+- **Date:** 2026-09-03
+- **Status:** Accepted
+- **Required by:** `BUILD-SPEC.md` §13 rule 9, §17 Phase 17
+
+### Context
+
+The registry decides what WP Debloat offers to change about a site. Anything
+that can replace it can change what this plugin does to somebody's shop, which
+makes "where did these bytes come from" a security question rather than a
+packaging one.
+
+### Decision
+
+A release is a git tag plus a manifest: every file with its SHA-256, signed once
+with Ed25519 over the **canonical** form of the whole list.
+
+Canonical rather than the bytes on disk, because a signature that broke when
+somebody reformatted a file would be a signature nobody maintains — and because
+signing a canonical form means key order cannot be used to forge one.
+
+The update path is written as a sequence of refusals with one narrow way
+through, and every one of them has a test:
+
+| Check | On failure |
+|---|---|
+| Did the user ask? | No request is made at all |
+| Is a key pinned, and is libsodium present? | Refuse — never "skip the check" |
+| Is the signature ours, over the canonical manifest? | Refuse |
+| Is the manifest for this product, in a format we know? | Refuse |
+| Is every path a plain relative `.json`? | Refuse |
+| Does every file's SHA-256 match? | Refuse **the whole release** |
+| Does every file parse as JSON? | Refuse |
+
+Three of those deserve their reasons stated.
+
+**Whole-release rejection.** One bad hash rejects everything, not just that file.
+A registry half from one version and half from another is a configuration nobody
+tested, and it would be assembled silently.
+
+**Paths are checked even though the manifest is signed.** A signing key that
+leaks should cost the registry's integrity, not the filesystem. `..`, absolute
+paths, drive letters and anything not ending in `.json` are refused before a
+byte is fetched.
+
+**JSON only, checked twice.** The path must end in `.json` and the contents must
+parse as one. Handlers stay in the plugin; nothing from a remote is executed,
+and this code cannot write a `.php` file even if asked to.
+
+### Fail closed with no key
+
+`SignatureVerifier::PUBLIC_KEY_HEX` is empty, because no signing key exists yet.
+While it is empty **every update check refuses** — it does not skip verification
+for want of something to verify against. A test asserts the constant is empty, so
+pinning a real key later is a deliberate change to a test rather than a quiet
+edit to a constant.
+
+### Consequences
+
+- The signing key never enters the repository. `tools/registry-manifest.php`
+  refuses a key path inside the working tree, and `ServiceArchitectureTest`
+  already refuses anything key-shaped in the package.
+- `RegistryUpdater` stages a verified release and reports; it does not activate
+  one. Fetching and installing in a single call would let a network failure
+  halfway through leave a site with half a registry.
+- Tests generate a keypair at runtime and never write it down. A test key in the
+  repository would be a key in the package, which is the thing being avoided.
+
+---
+
+## D-0044 — Updating the registry is not part of the registry
+
+- **Phase:** 17
+- **Date:** 2026-09-03
+- **Status:** Accepted
+
+### Context
+
+The update code was first written under `src/Registry/Update/`, which failed a
+Phase 0 invariant: `src/Registry` and `src/Contracts` must not call WordPress,
+because the unit suite loads them with no WordPress at all. `RegistryUpdater`
+needs `wp_remote_get()`.
+
+### Decision
+
+The invariant was right and the placement was wrong. The whole concern moved to
+`src/Update/`.
+
+`src/Registry` is *what the registry is* — documents, schemas, a loader, value
+objects, all pure. `src/Update` is *how a newer one arrives*, which is a network
+operation and a WordPress one. They were never the same thing; putting them
+together only looked tidy.
+
+### Consequences
+
+- `src/Registry` stays loadable without WordPress, which is what keeps the unit
+  suite honest about the boundary.
+- A test that would have been quietly deleted — "loosen the invariant, it is
+  only one file" — instead produced a better arrangement. That is the invariant
+  doing its job.
+
+---
+
+## D-0045 — The registry repository is prepared, not published
+
+- **Phase:** 17
+- **Date:** 2026-09-03
+- **Status:** Accepted
+- **Required by:** `BUILD-SPEC.md` §17 Phase 17, and the build's external-action
+  boundary
+
+### Context
+
+§17 asks for `registry/` to become the public repository
+`scornik/wp-debloat-registry`, with its own CI.
+
+Creating a public repository is an external act. It needs a person's decision
+and their credentials, and it publishes something that cannot be unpublished.
+
+### Decision
+
+The layout, the manifest, the release tooling and the CI workflow are all
+written and tested. **The repository is not created and nothing is pushed to
+it.**
+
+`registry/` is already shaped to become that repository's root unchanged, and
+`.github/workflows/registry.yml` is the CI it will need — validating every JSON
+document, checking the manifest describes what is on disk, and running the
+plugin's own suites against the registry, because a tweak that validates and
+then does nothing is worse than one that fails to parse.
+
+### Consequences
+
+- Nothing in the plugin depends on the split having happened. The vendored
+  snapshot is the source of truth until a signed release replaces it, and
+  `wp debloat registry` reports the tag it is carrying.
+- §17's exit criterion "remote publication is not required for local phase
+  completion" is met exactly as written.
+- The CI workflow currently lives in this repository and runs against
+  `registry/**` here. When the split happens it moves with the directory and
+  gains the plugin as a second checkout.
