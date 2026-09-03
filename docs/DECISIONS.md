@@ -1369,3 +1369,149 @@ time. That is worth having. It is not worth a single skipped backup.
   the user stated belongs in the history of the change, next to what was done.
 - The refusal test does not care about the attestation, which is the point: it
   passes a ticked box and still expects the refusal.
+
+---
+
+## D-0028 — "Already handled by host" is a claim the facts contradict
+
+- **Phase:** 11
+- **Date:** 2026-09-03
+- **Status:** Accepted
+- **Required by:** `BUILD-SPEC.md` §17 Phase 11
+- **Deviates from:** the literal wording of that phase
+
+### Context
+
+Phase 11 asks for `plugins.host_optimizer_detected` to mark overlapping tweak
+findings as `info` with the reason "already handled by host". The intent is
+sound: a site whose host ships its own optimizer, or which runs a cache plugin
+with the same switches built in, should not be nagged about ground somebody else
+already covers.
+
+Implementing it revealed that the reason is false at precisely the moment it
+would be shown.
+
+Every finding this could apply to is observation-backed. `wp.emojis.loaded`
+fires because `wp.emojis_enabled` is true — because the emoji script is on the
+page. If the other optimizer had handled it, the fact would be false and there
+would be no finding to downgrade. So a finding that survives to the point of
+being marked "already handled" is, by construction, one that nothing has
+handled. Marking it `info` would also understate a cost the site is really
+paying, and the score exists to be believed.
+
+### Decision
+
+Keep the phase's intent and drop its wording.
+
+- A finding on ground another present tool also offers a setting for **gains a
+  sentence** naming that tool and where its setting lives.
+- It keeps its severity, its decision and its recommendation. The choice stays
+  with the user, who now knows there are two places to make it.
+- `plugins.host_optimizer_detected` still exists, still `info`, and reports which
+  optimizers are present.
+- The claim made is "there is another place to change this", which does not
+  depend on how the other tool's switch is currently set — something WP Debloat
+  cannot read and will not guess at.
+
+The case the original wording was reaching for — an optimizer WP Debloat would
+actively *fight* with, where leaving it alone is right regardless of what the
+scan observed — is a refusal, and refusals already have a home: the compatibility
+registry, where they carry their reason and produce `dont_touch`.
+
+### Consequences
+
+- `registry/host-optimizers.json` says what a layer *offers*, never what it has
+  done. Its `covers` list is deliberately short: an entry belongs there only when
+  the setting is visible in that product's own interface.
+- `Finding::withAddedReasoning()` is added — the analyzer already amends a
+  finding's confidence, decision and risk after the rule returns; this amends the
+  one field a person reads.
+- A registry test asserts every `covers` id is a finding id some rule actually
+  produces. The first draft named `wp.emojis.enabled`, which is the *fact* key;
+  the finding is `wp.emojis.loaded`. Nothing failed — the feature was simply a
+  no-op that looked implemented.
+
+---
+
+## D-0029 — Network consent is given per scan, not stored
+
+- **Phase:** 11
+- **Date:** 2026-09-03
+- **Status:** Accepted
+- **Required by:** `BUILD-SPEC.md` §13 rule 9, §17 Phase 11
+
+### Context
+
+Looking up a plugin's release date needs wordpress.org, and §13 rule 9 allows no
+outbound HTTP except loopback and opt-in. The obvious shape is a stored setting:
+a checkbox that, once ticked, makes every future scan reach out.
+
+### Decision
+
+There is no stored setting. `Plugin::scan()` takes a boolean, `wp debloat scan`
+takes `--check-plugin-updates`, and `POST /scan` takes `check_plugin_updates`,
+default false. The flag is cleared after the scan that used it.
+
+Two reasons.
+
+1. **Consent is for an action.** A person ticking a box in a settings screen in
+   March has not agreed to a request made in September by a cron job they forgot
+   about. Asking at the moment of the action is a stronger promise and a simpler
+   one to test: with the flag off, zero requests, asserted directly by counting
+   `pre_http_request`.
+2. **It must not travel.** The configuration document `wp debloat export` writes
+   is meant to be committed and applied to other sites. Network consent given on
+   one site is not consent on another, so it deliberately has no place in that
+   document — which is why it is not a stored setting in the first place.
+
+### Consequences
+
+- Phase 17's registry updates will need their own consent, and should follow the
+  same shape rather than inventing a global "allow network" flag.
+- `plugins.update_source` records which reading produced the staleness figure,
+  so a finding can be worded — and scored — for the reading it actually had. The
+  local fallback is a different claim in different words at a third of the
+  confidence.
+
+---
+
+## D-0030 — Registry tables, and where their schemas live
+
+- **Phase:** 11
+- **Date:** 2026-09-03
+- **Status:** Accepted
+- **Required by:** `BUILD-SPEC.md` §4, §17 Phase 11
+
+### Context
+
+The registry has been one document per object: one tweak, one detector, one
+compatibility rule, one profile per file, each validated by one of the six
+schemas §4 names. Phase 11 adds `registry/plugin-categories.json` — a lookup from
+plugin slug to functional category. A file per plugin would be forty files each
+holding a single word.
+
+### Decision
+
+Registry *tables* are a second shape: a single file holding a lookup, with its
+own schema in `registry/schemas/`. Two exist — `plugin-categories.json` and
+`host-optimizers.json`.
+
+The invariant that used to count six schemas now asserts the exact set by name,
+which is stricter: six object types plus two tables, and nothing else. The number
+was only ever a proxy, and one that had to be edited every time the truth
+changed.
+
+`schemas/config.schema.json` stays where it is. It describes a document `wp
+debloat export` writes, not registry content, and the distinction is worth
+keeping.
+
+### Consequences
+
+- A table is optional. A registry without one loads and yields an empty table, so
+  the rules that read it simply have nothing to say.
+- Both tables are in the registry hash. A plan's determinism claim is "same
+  facts, same profile, same registry", and a category map that could change
+  without changing the hash would break that claim quietly.
+- Tables hold identifiers and names only. What running two page caches costs is
+  reasoning, and reasoning lives in the analyzer — the registry says what a
+  plugin *is*.
