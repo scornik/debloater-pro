@@ -49,6 +49,11 @@ final class Screen {
 	private const ACTION = 'debloater_pro_save';
 
 	/**
+	 * The action name for serving a report.
+	 */
+	private const REPORT = 'debloater_pro_report';
+
+	/**
 	 * Pro.
 	 *
 	 * @var Pro
@@ -72,6 +77,7 @@ final class Screen {
 	public function boot(): void {
 		add_action( 'admin_menu', array( $this, 'registerMenu' ), 11 );
 		add_action( 'admin_post_' . self::ACTION, array( $this, 'handlePost' ) );
+		add_action( 'admin_post_' . self::REPORT, array( $this, 'serveReport' ) );
 	}
 
 	/**
@@ -143,6 +149,43 @@ final class Screen {
 	}
 
 	/**
+	 * Serve one report as a document of its own.
+	 *
+	 * Through `admin-post.php` rather than the screen callback, and that is not
+	 * a preference. A submenu callback runs *after* WordPress has already
+	 * printed the admin header, the sidebar and any notices other plugins have
+	 * queued — so echoing a complete `<!doctype html>` document from one puts a
+	 * second document inside the first. The first version did exactly that, and
+	 * the report came out wrapped in the admin chrome with somebody else's
+	 * "activate your licence" notice above the heading.
+	 *
+	 * `admin-post.php` runs before any of that, which is what a page meant to
+	 * be printed needs.
+	 *
+	 * @return void
+	 */
+	public function serveReport(): void {
+		if ( ! Capabilities::currentUserCanManage() ) {
+			wp_die( esc_html__( 'You do not have permission to manage Debloater on this site.', 'debloater-pro' ) );
+		}
+
+		check_admin_referer( self::REPORT );
+
+		$run_id = isset( $_GET['run'] ) ? absint( wp_unslash( $_GET['run'] ) ) : 0;
+		$html   = 0 === $run_id ? '' : $this->pro->renderReport( $run_id );
+
+		if ( '' === $html ) {
+			wp_die( esc_html__( 'There is no report for that change.', 'debloater-pro' ) );
+		}
+
+		// Assembled and escaped field by field in BeforeAfterReport::render(),
+		// and served as the whole response rather than part of a page.
+		echo $html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped at construction; see BeforeAfterReport::render().
+
+		exit;
+	}
+
+	/**
 	 * Render the screen.
 	 *
 	 * @return void
@@ -150,28 +193,6 @@ final class Screen {
 	public function render(): void {
 		if ( ! Capabilities::currentUserCanManage() ) {
 			wp_die( esc_html__( 'You do not have permission to manage Debloater on this site.', 'debloater-pro' ) );
-		}
-
-		// A report is a whole document — its own <html>, its own print CSS —
-		// so it is served instead of the screen rather than inside it. Printed
-		// from the browser, which is why there is no PDF library
-		// (docs/DECISIONS.md D-0049).
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Reading a run id to display; it changes nothing, and the capability check above is what guards it.
-		$report = isset( $_GET['report'] ) ? absint( wp_unslash( $_GET['report'] ) ) : 0;
-
-		if ( 0 !== $report ) {
-			$html = $this->pro->renderReport( $report );
-
-			if ( '' === $html ) {
-				wp_die( esc_html__( 'There is no report for that change.', 'debloater-pro' ) );
-			}
-
-			// Built entirely by BeforeAfterReport, which escapes every value it
-			// puts in. Echoed whole because it is a document rather than a
-			// fragment of this page.
-			echo $html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Assembled and escaped field by field in BeforeAfterReport::render().
-
-			exit;
 		}
 
 		$entitlement = $this->pro->entitlement()->entitlement();
@@ -464,12 +485,15 @@ final class Screen {
 		echo '</tr></thead><tbody>';
 
 		foreach ( $runs as $run ) {
-			$url = add_query_arg(
-				array(
-					'page'   => self::SLUG,
-					'report' => (int) $run->id,
+			$url = wp_nonce_url(
+				add_query_arg(
+					array(
+						'action' => self::REPORT,
+						'run'    => (int) $run->id,
+					),
+					admin_url( 'admin-post.php' )
 				),
-				admin_url( 'admin.php' )
+				self::REPORT
 			);
 
 			echo '<tr>';

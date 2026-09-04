@@ -78,6 +78,9 @@ final class ProScreenTest extends IntegrationTestCase {
 
 		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
 
+		// Cleared so the assertion below is about this boot rather than about
+		// whatever an earlier test left in the global.
+		// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- The point of the test is what add_submenu_page() writes here.
 		$submenu = array();
 
 		$this->pro->boot();
@@ -221,6 +224,95 @@ final class ProScreenTest extends IntegrationTestCase {
 		// §12 invariant 14: measured figures only, and never a speed claim.
 		foreach ( array( 'faster', 'slower', 'speed up' ) as $claim ) {
 			$this->assertStringNotContainsString( $claim, strtolower( $html ) );
+		}
+
+		$this->unregisterHandlers( array( 'core.remove_generator' ) );
+	}
+
+	/**
+	 * The report shows the measurements the apply actually recorded.
+	 *
+	 * The assertion that was missing. Every report on a live site said
+	 * "Nothing was measured for this change" — including for applies that had
+	 * measured plenty — because the report read
+	 * `payload['measurements']` as `{ label: { before, after } }`, a shape
+	 * nothing has ever written. What `ApplyManager` stores is
+	 * `Comparison::toArray()`: `{ before, after, deltas, changed, unknown }`.
+	 *
+	 * The old test only ever asked whether the report escaped what it printed,
+	 * which it did — of an empty table. Asserting on the *content* is what
+	 * catches a reader pointed at the wrong shape.
+	 *
+	 * @return void
+	 */
+	public function test_the_report_shows_what_was_measured(): void {
+		$this->plugin->scan();
+
+		$preview = $this->plugin->previewTweaks( array( 'core.remove_generator' ) );
+
+		$this->assertNotNull( $preview );
+
+		$result = $this->plugin->apply( $preview->plan );
+		$run    = $this->plugin->runs()->find( $result->run_id );
+
+		$this->assertNotNull( $run );
+
+		$measured = $run->payload['measurements'] ?? array();
+
+		// The producer's shape, named here so a change to it fails this test
+		// rather than quietly emptying the report again.
+		$this->assertIsArray( $measured );
+		$this->assertArrayHasKey( 'deltas', $measured, 'ApplyManager stores Comparison::toArray()' );
+		$this->assertNotEmpty( $measured['deltas'], 'this apply should have measured something' );
+
+		$html = $this->pro->renderReport( $result->run_id );
+
+		$this->assertStringNotContainsString(
+			'Nothing was measured',
+			$html,
+			'The report must show the measurements the run recorded.'
+		);
+
+		// Every metric it measured appears by name.
+		foreach ( $measured['deltas'] as $delta ) {
+			$this->assertStringContainsString( (string) $delta['metric'], $html );
+		}
+
+		$this->unregisterHandlers( array( 'core.remove_generator' ) );
+	}
+
+	/**
+	 * A run that applied nothing is not offered a report.
+	 *
+	 * An aborted run changed nothing and has nothing to compare. Listing one
+	 * is how a client ends up reading a page about a change that never
+	 * happened.
+	 *
+	 * @return void
+	 */
+	public function test_only_runs_that_changed_something_are_listed(): void {
+		$this->plugin->scan();
+
+		$preview = $this->plugin->previewTweaks( array( 'core.remove_generator' ) );
+
+		$this->assertNotNull( $preview );
+
+		$applied = $this->plugin->apply( $preview->plan );
+
+		$listed = array_map(
+			static fn ( $run ): int => (int) $run->id,
+			$this->pro->appliedRuns( 20 )
+		);
+
+		$this->assertContains( $applied->run_id, $listed );
+
+		foreach ( $this->pro->appliedRuns( 20 ) as $run ) {
+			$this->assertNotSame(
+				'ABORTED',
+				$run->status,
+				'An aborted run applied nothing and must not be offered a report.'
+			);
+			$this->assertNotSame( 'ROLLED_BACK', $run->status );
 		}
 
 		$this->unregisterHandlers( array( 'core.remove_generator' ) );

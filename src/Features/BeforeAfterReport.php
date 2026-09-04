@@ -107,8 +107,8 @@ final class BeforeAfterReport {
 			return '';
 		}
 
-		$measurements = $this->measurements( $run );
-		$branding     = $this->branding();
+		$deltas   = $this->deltas( $run );
+		$branding = $this->branding();
 
 		$html  = '<!doctype html><html><head><meta charset="utf-8">';
 		$html .= '<title>' . esc_html( $this->title( $branding ) ) . '</title>';
@@ -117,7 +117,7 @@ final class BeforeAfterReport {
 		$html .= '<h1>' . esc_html( $this->title( $branding ) ) . '</h1>';
 		$html .= '<p class="when">' . esc_html( $run->started_at ) . '</p>';
 
-		if ( array() === $measurements ) {
+		if ( array() === $deltas ) {
 			// Nothing was measured. Saying so is the report; inventing a figure
 			// to fill the space is the one thing this must never do.
 			$html .= '<p class="none">' . esc_html__(
@@ -132,12 +132,12 @@ final class BeforeAfterReport {
 			$html .= '<th>' . esc_html__( 'Difference', 'debloater-pro' ) . '</th>';
 			$html .= '</tr></thead><tbody>';
 
-			foreach ( $measurements as $label => $pair ) {
+			foreach ( $deltas as $delta ) {
 				$html .= '<tr>';
-				$html .= '<td>' . esc_html( (string) $label ) . '</td>';
-				$html .= '<td>' . esc_html( (string) $pair['before'] ) . '</td>';
-				$html .= '<td>' . esc_html( (string) $pair['after'] ) . '</td>';
-				$html .= '<td>' . esc_html( $this->delta( $pair['before'], $pair['after'] ) ) . '</td>';
+				$html .= '<td>' . esc_html( $this->label( $delta ) ) . '</td>';
+				$html .= '<td>' . esc_html( $this->figure( $delta['before'] ) ) . '</td>';
+				$html .= '<td>' . esc_html( $this->figure( $delta['after'] ) ) . '</td>';
+				$html .= '<td>' . esc_html( $this->difference( $delta ) ) . '</td>';
 				$html .= '</tr>';
 			}
 
@@ -153,53 +153,101 @@ final class BeforeAfterReport {
 	}
 
 	/**
-	 * The measured before/after pairs stored on a run.
+	 * One row's name, with its unit when it has one.
 	 *
-	 * @param \Debloater\Contracts\Run $run The run.
-	 * @return array<string,array{before:int|float,after:int|float}>
+	 * @param array<string,mixed> $delta One entry from the comparison.
+	 * @return string
 	 */
-	private function measurements( \Debloater\Contracts\Run $run ): array {
-		$measured = $run->payload['measurements'] ?? array();
+	private function label( array $delta ): string {
+		$metric = is_string( $delta['metric'] ?? null ) ? $delta['metric'] : '';
+		$unit   = is_string( $delta['unit'] ?? null ) ? $delta['unit'] : '';
 
-		if ( ! is_array( $measured ) ) {
-			return array();
-		}
-
-		$pairs = array();
-
-		foreach ( $measured as $label => $pair ) {
-			if ( ! is_array( $pair ) || ! isset( $pair['before'], $pair['after'] ) ) {
-				continue;
-			}
-
-			if ( ! is_numeric( $pair['before'] ) || ! is_numeric( $pair['after'] ) ) {
-				continue;
-			}
-
-			$pairs[ (string) $label ] = array(
-				'before' => $pair['before'] + 0,
-				'after'  => $pair['after'] + 0,
-			);
-		}
-
-		return $pairs;
+		return '' === $unit ? $metric : sprintf( '%s (%s)', $metric, $unit );
 	}
 
 	/**
-	 * The difference between two figures, signed.
+	 * A figure, or a dash where there is not one.
 	 *
-	 * @param int|float $before Before.
-	 * @param int|float $after  After.
+	 * @param mixed $value Measured value.
 	 * @return string
 	 */
-	private function delta( int|float $before, int|float $after ): string {
-		$difference = $after - $before;
+	private function figure( mixed $value ): string {
+		if ( ! is_numeric( $value ) ) {
+			// A measurement that could not be taken. An em dash, not a zero:
+			// "we did not measure this" and "this was zero" are different
+			// statements and only one of them is true here.
+			return '—';
+		}
 
-		if ( 0 === $difference || 0.0 === $difference ) {
+		return (string) ( $value + 0 );
+	}
+
+	/**
+	 * The difference, signed, or why there is not one.
+	 *
+	 * @param array<string,mixed> $delta One entry from the comparison.
+	 * @return string
+	 */
+	private function difference( array $delta ): string {
+		if ( ! is_numeric( $delta['delta'] ?? null ) ) {
+			$reason = is_string( $delta['reason'] ?? null ) ? $delta['reason'] : '';
+
+			return '' === $reason ? __( 'not measured', 'debloater-pro' ) : $reason;
+		}
+
+		$change = $delta['delta'] + 0;
+
+		if ( 0 === $change || 0.0 === $change ) {
 			return __( 'no change', 'debloater-pro' );
 		}
 
-		return ( $difference > 0 ? '+' : '' ) . (string) $difference;
+		$figure = ( $change > 0 ? '+' : '' ) . (string) $change;
+
+		// The percentage only when the comparison worked one out. It refuses to
+		// produce one from a "before" of zero, and passing that refusal through
+		// rather than computing something here is the point.
+		if ( is_numeric( $delta['percent'] ?? null ) ) {
+			return sprintf( '%s (%s%%)', $figure, (string) ( $delta['percent'] + 0 ) );
+		}
+
+		return $figure;
+	}
+
+	/**
+	 * The measured differences stored on a run.
+	 *
+	 * `ApplyManager` writes `Comparison::toArray()` into
+	 * `$run->payload['measurements']`, which is
+	 * `{ before, after, deltas, changed, unknown }` — and `deltas` is the list
+	 * this report wants: one entry per metric with its unit, its before and
+	 * after, the change, a percentage where an honest one exists, and a reason
+	 * when the measurement could not be taken.
+	 *
+	 * The first version of this read the payload as
+	 * `{ label: { before, after } }`, a shape nothing has ever written. It
+	 * matched nothing, so every report said "nothing was measured" — including
+	 * for applies that had measured plenty. Reading the producer rather than
+	 * guessing at the consumer is the whole fix.
+	 *
+	 * @param \Debloater\Contracts\Run $run The run.
+	 * @return array<int,array<string,mixed>>
+	 */
+	private function deltas( \Debloater\Contracts\Run $run ): array {
+		$measured = $run->payload['measurements'] ?? array();
+
+		if ( ! is_array( $measured ) || ! is_array( $measured['deltas'] ?? null ) ) {
+			return array();
+		}
+
+		$deltas = array();
+
+		foreach ( $measured['deltas'] as $delta ) {
+			if ( is_array( $delta ) && isset( $delta['metric'] ) ) {
+				$deltas[] = $delta;
+			}
+		}
+
+		return $deltas;
 	}
 
 	/**

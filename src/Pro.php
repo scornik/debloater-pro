@@ -9,6 +9,7 @@ declare( strict_types = 1 );
 
 namespace Debloater\Pro;
 
+use Debloater\Contracts\RunState;
 use Debloater\Contracts\RunType;
 use Debloater\Plugin;
 use Debloater\Pro\Admin\Screen;
@@ -302,7 +303,32 @@ final class Pro {
 	 * @return array<int,\Debloater\Contracts\Run>
 	 */
 	public function appliedRuns( int $limit = 10 ): array {
-		return $this->plugin->runs()->recent( $limit, RunType::APPLY );
+		$runs = array();
+
+		// Only runs that actually changed something. An aborted run applied
+		// nothing and has nothing to compare, and offering a report for one is
+		// how a client ends up looking at a page about a change that never
+		// happened. Rolled-back runs are excluded for the same reason: the site
+		// ended where it started.
+		$reportable = array(
+			RunState::COMMITTED->value,
+			RunState::VERIFIED->value,
+			RunState::VERIFIED_WITH_WARNINGS->value,
+		);
+
+		foreach ( $this->plugin->runs()->recent( $limit * 4, RunType::APPLY ) as $run ) {
+			if ( ! in_array( $run->status, $reportable, true ) ) {
+				continue;
+			}
+
+			$runs[] = $run;
+
+			if ( count( $runs ) >= $limit ) {
+				break;
+			}
+		}
+
+		return $runs;
 	}
 
 	/**
