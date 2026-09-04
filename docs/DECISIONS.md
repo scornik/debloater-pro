@@ -2642,3 +2642,63 @@ site what it has paid for.
   back. None of those is what was paid for, and none is gated.
 - The cached option is **not autoloaded**, matching the free plugin's rule: it
   is read on admin requests and by cron, never on a front-end page view.
+
+---
+
+## D-0052 – the tagline drops "WordPress"
+
+- **Phase:** 18 (post-audit)
+- **Date:** 2026-09-04
+- **Status:** accepted
+- **Amends:** D-0047, which fixed the display title
+- **Required by:** `BUILD-SPEC.md` §13 rule 15 and the Phase 18 exit criterion
+  "make the Plugin Check report clean"
+
+### Context
+
+D-0047 chose **"Debloater – Scan, Fix & Undo WordPress Bloat"** on the stated
+basis that "WordPress" is permitted in a display name and forbidden only in a
+slug. That is what the reference material says. It is not what the tool does.
+
+Plugin Check, run against the tree that actually ships:
+
+> The plugin name includes a restricted term. Your chosen plugin name –
+> "Debloater – Scan, Fix & Undo WordPress Bloat" – contains the restricted
+> term "wordpress" which cannot be used at all in your plugin name.
+
+It was the only finding left after Phase 18 took the report from 407 to 2, and
+it was recorded rather than fixed because it is a naming decision and naming
+decisions belong to a person.
+
+### Decision
+
+**`Brand::TAGLINE` becomes `Scan, Fix & Undo Site Bloat`.**
+The display title is **"Debloater – Scan, Fix & Undo Site Bloat"**.
+
+Nothing else changes. The name is still `Debloater`, the slug is still
+`debloater`, and both were already clean.
+
+### What it costs
+
+The word "WordPress" in the listing title. That was there for search: it is the
+word people type, and a wordpress.org search result shows the title and little
+else.
+
+What is kept is "Bloat", which is the term this category is actually searched
+on, and the description below the title still says WordPress in the first
+sentence – where it is permitted, and where a search engine reads it.
+
+### Why now rather than at submission
+
+Because it is one line, and because leaving it would mean the final audit
+shipping with a known warning attached to a decision nobody had made. A warning
+that stays open long enough stops being read.
+
+### Consequences
+
+- **Plugin Check is now clean: 0 errors, 0 warnings.**
+- `ReleaseReadinessTest` had an assertion encoding the wrong premise – it
+  required the tagline to contain "WordPress". It now holds the tagline to the
+  same restricted-term rule as the name and the slug, so the belief that caused
+  this cannot be reintroduced quietly.
+- D-0047 stands as the record of the rename; this amends only its tagline.

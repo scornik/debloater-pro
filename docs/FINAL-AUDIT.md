@@ -60,7 +60,7 @@ Every gate in §21.7, run at this commit.
 | ESLint | clean |
 | Jest | 12 tests — pass |
 | Bundle budget | 10 790 B gzipped — **4%** of the 256 KB budget |
-| Plugin Check, against the shipped tree | **0 errors, 2 warnings** — see §4 |
+| Plugin Check, against the shipped tree | **0 errors, 0 warnings** — clean |
 | Security invariants (§13, one test per rule) | 15 of 15 — pass |
 | Runtime zero-overhead (§14) | pass |
 | Rollback / restore round trip | pass |
@@ -100,35 +100,30 @@ survives, and an operation that never collected deletes nothing.
 
 ## 4. Known warnings
 
-Five, all recorded rather than resolved, and none of them a red gate.
+Four. All recorded rather than resolved, and none of them a red gate.
 
-**1. The display title draws a `trademarked_term` warning.**
+**The `trademarked_term` warning listed here at the time of the audit has since
+been closed.** The tagline dropped "WordPress" and became
+"Debloater – Scan, Fix & Undo Site Bloat" (D-0052), which was the naming
+decision the audit said belonged to a person. **Plugin Check now reports 0
+errors and 0 warnings.**
 
-> The plugin name includes a restricted term. Your chosen plugin name —
-> "Debloater – Scan, Fix & Undo WordPress Bloat" — contains the restricted term
-> "wordpress" which cannot be used at all in your plugin name.
-
-`Debloater` and `debloater` are both clean; only the tagline draws it. It is a
-warning rather than an error, and the title was chosen deliberately for search.
-Dropping the word from `Brand::TAGLINE` clears it and is a one-line change. This
-is a naming decision and belongs to a person.
-
-**2. No release has ever been signed.** `SignatureVerifier::PUBLIC_KEY_HEX` is
+**1. No release has ever been signed.** `SignatureVerifier::PUBLIC_KEY_HEX` is
 empty, which means the verifier fails **closed** — the safe direction. The
 verification path is fully implemented and tested against runtime keypairs.
 Pinning a real public key is a release-time step needing a key that does not yet
 exist.
 
-**3. The registry repository is not published.** Layout, manifest tooling and CI
+**2. The registry repository is not published.** Layout, manifest tooling and CI
 are complete and tested. Creating a public repository is an external act needing
 a person's credentials and publishing something that cannot be unpublished
 (D-0045). §17 explicitly permits local completion without it.
 
-**4. `RegistryUpdater` stages a verified release; it does not activate one.**
+**3. `RegistryUpdater` stages a verified release; it does not activate one.**
 Swapping the live registry is a separate act and belongs with the apply
 machinery, not the download.
 
-**5. Applies in wp-env return exit 3, "applied but not verified."** wp-env runs
+**4. Applies in wp-env return exit 3, "applied but not verified."** wp-env runs
 the site and the runner in separate containers, so the site cannot reach itself
 over loopback (D-0009). The verifier is correct; the environment cannot exercise
 it. Verification is covered instead by the fail-probe suite, which forces a
@@ -198,19 +193,20 @@ required:
 
 ## 8. Release readiness
 
-**The free plugin is ready to submit.** Plugin Check is clean of errors against
+**The free plugin is ready to submit.** Plugin Check is entirely clean against
 the tree that actually ships, the zip builds reproducibly from an allow-list at
 301 files and 522 KB, the readme validates, the POT covers 517 strings, and
 `uninstall.php` honours §13 rule 10 — the runtime and loader always go, the
 recovery points stay unless the site opted in.
 
-Three things need a person before submission:
+Two things need a person before submission:
 
-1. **Decide the display title** (warning 1). One line.
-2. **Generate a signing key and pin its public half.** Until then the registry
+1. **Generate a signing key and pin its public half.** Until then the registry
    verifier fails closed, which is safe but means updates cannot be adopted.
-3. **Reserve `debloater` on wordpress.org** by submitting. The slug is not yet
+2. **Reserve `debloater` on wordpress.org** by submitting. The slug is not yet
    claimed, and it is the one thing here that cannot be changed afterwards.
+
+The display title is settled (D-0052).
 
 **Pro is feature-complete and commercially unwired.** It needs a Freemius
 account and a plan named `pro` or `agency` to unlock anything; without one it
