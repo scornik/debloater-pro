@@ -46,7 +46,7 @@ final class Pro {
 	/**
 	 * Version.
 	 */
-	public const VERSION = '0.1.0';
+	public const VERSION = '0.1.1';
 
 	/**
 	 * Where entitlement comes from.
