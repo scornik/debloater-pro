@@ -2702,3 +2702,107 @@ that stays open long enough stops being read.
   same restricted-term rule as the name and the slug, so the belief that caused
   this cannot be reintroduced quietly.
 - D-0047 stands as the record of the rename; this amends only its tagline.
+
+---
+
+## D-0053 – the zip is written in-process, never by an OS tool
+
+- **Phase:** 18b
+- **Date:** 2026-09-04
+- **Status:** accepted
+- **Amends:** the packaging half of Phase 18
+
+### Context
+
+`debloater-0.1.0.zip` shipped and could not be installed. All 302 entries used
+**backslash** separators, because the build shelled out to `Compress-Archive`
+under Windows PowerShell 5.1. On a Linux host WordPress extracts
+`debloater\debloater.php` as one flat file whose *name* contains a backslash,
+the plugin directory ends up empty, and activation fails with "Plugin file does
+not exist."
+
+Two things about how it shipped are worth recording.
+
+**The build was platform-dependent by design.** It branched on
+`process.platform` and used a different tool on each side. Nobody ever built on
+Linux, so the Windows branch was the only one that had ever run, and its output
+was never compared with anything.
+
+**The verification was blind to the defect.** Python's `zipfile.namelist()` –
+and most zip readers – normalise backslashes to forward slashes on read. The
+obvious check reported *zero* offending entries on an archive where every entry
+was wrong. It was reported as verified in good faith and was not verified at
+all.
+
+### Decision
+
+**`archiver`, in-process, on every platform. No PowerShell, no `zip`, no OS
+tool, no branch on `process.platform`.**
+
+Entry names are built by joining with a literal `/`, never `path.join`. Explicit
+directory entries are written, parents first. There is one top-level folder,
+named for the slug.
+
+### How it is held
+
+`tests/packaging/zip.test.mjs` parses the **central directory bytes** rather
+than asking a library for the names, because a test that reads through the same
+normalisation as the bug cannot see the bug. It then extracts the archive inside
+a Linux container and asserts WordPress activates the result.
+
+CI runs it on **ubuntu-latest and windows-latest**, and a `package-parity` job
+diffs the entry listings the two produce. Two platforms agreeing is a stronger
+claim than each passing its own checks, and it is the specific thing that was
+missing.
+
+### Consequences
+
+- `npm run plugin-zip` builds both plugins; `plugin-zip:free` and
+  `plugin-zip:pro` build one.
+- `archiver` is a dev dependency. The plugin still ships zero runtime
+  dependencies.
+
+---
+
+## D-0054 – `Plugin Name` is the short name, and what that costs
+
+- **Phase:** 18b
+- **Date:** 2026-09-04
+- **Status:** accepted, with one open item
+- **Amends:** D-0052
+
+### Decision
+
+The plugin header reads `Plugin Name: Debloater` and nothing else.
+`readme.txt` keeps the full title in its `=== ... ===` line, sourced from the
+new `Brand::FULL_TITLE` constant. `ReleaseReadinessTest` asserts both exactly.
+
+The reasoning is that wordpress.org derives the slug from the plugin name, and a
+header reading "Debloater – Scan, Fix & Undo Site Bloat" risks a slug like
+`debloater-scan-fix-undo-site-bloat` – permanent, unfixable after publication,
+and not the slug D-0047 chose.
+
+### The open item
+
+Plugin Check disagrees, and says so:
+
+> Plugin name "Debloater – Scan, Fix & Undo Site Bloat" is different from the
+> name declared in plugin header "Debloater".
+
+`mismatched_plugin_name`, one warning, no errors. It wants the readme title and
+the header to be identical, which is exactly what this decision makes them not
+be.
+
+Both cannot hold. The two ways out:
+
+1. **Header and readme both `Debloater`.** Clears the warning and makes the slug
+   unambiguous. The tagline moves to the short description under the header
+   block, which is what wordpress.org actually displays as a plugin's one-line
+   summary anyway – so little is lost.
+2. **Header and readme both the full title.** Clears the warning and accepts
+   whatever slug the review process derives.
+
+Option 1 is the better trade and gives up almost nothing. It is not applied
+here because the title is a naming decision and the brief for this phase was
+explicit that the full title stays in the readme. Recorded rather than decided
+unilaterally.
