@@ -2806,3 +2806,65 @@ Option 1 is the better trade and gives up almost nothing. It is not applied
 here because the title is a naming decision and the brief for this phase was
 explicit that the full title stays in the readme. Recorded rather than decided
 unilaterally.
+
+---
+
+## D-0055 – the apply lock carries its own expiry
+
+- **Phase:** 18d
+- **Date:** 2026-09-04
+- **Status:** accepted
+- **Amends:** the lock described in `BUILD-SPEC.md` section 8
+
+### Context
+
+Reported from a live site: every apply refused with "Another change is already
+in progress on this site. Wait for it to finish and try again." The last
+committed run had finished twenty-five minutes earlier. The lock TTL is sixty
+seconds.
+
+It was a deadlock with two halves, and neither is wrong on its own.
+
+**`Lock` was a WordPress transient**, which is two options: `_transient_x`
+holding the value and `_transient_timeout_x` holding the expiry. `acquire()`
+wrote them with two separate `add_option()` calls. `get_transient()` treats a
+value with **no timeout row as one that never expires** – so a request that
+died between the two writes, or a second write that failed because a stale
+timeout row was already present, left a lock that nothing would ever release.
+
+**`ApplyManager::recoverInterruptedRuns()` steps aside while the lock is held**,
+on the reasoning that a held lock means a live apply. That is right in general
+and exactly wrong here: the one mechanism that could have cleared the lock was
+the one thing the stuck lock prevented. The site could never apply anything
+again, and the only thing it ever said was "wait for it to finish".
+
+The class docblock claimed "the worst case is a wait rather than a permanently
+stuck site". That claim was false in this code path, which is worth noting on
+its own: the reasoning was written down and the code did not implement it.
+
+### Decision
+
+**The token and the expiry live in one value, written once:** `token|expiry`.
+
+`heldBy()` parses it and decides expiry itself rather than inferring it from
+another row's presence. There is no second write to lose and no window between
+two writes.
+
+A stored value that does **not** parse – a bare token with no expiry – is
+treated as free. That is precisely the shape the old scheme left behind, so a
+site carrying a stuck lock starts working again on its next request rather than
+needing somebody to find an options row and delete it.
+
+The option keeps its `_transient_` name so `delete_transient()` in
+`uninstall.php` still removes it.
+
+### Consequences
+
+- The stuck-lock deadlock cannot recur: an expired lock reads as free, so
+  recovery runs.
+- `tests/Integration/ApplyLockTest.php` holds all of it, including the
+  end-to-end deadlock. All eight tests were confirmed to fail against the old
+  behaviour before the fix was restored.
+- No "clear the lock" button was added. With a real expiry the lock self-heals
+  in a minute, and a button that lets somebody break a genuinely running apply
+  is a worse failure than the one it would fix.

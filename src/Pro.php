@@ -9,7 +9,9 @@ declare( strict_types = 1 );
 
 namespace Debloater\Pro;
 
+use Debloater\Contracts\RunType;
 use Debloater\Plugin;
+use Debloater\Pro\Admin\Screen;
 use Debloater\Pro\Cloud\CloudServiceClient;
 use Debloater\Pro\Cloud\HakeemifyCloudClient;
 use Debloater\Pro\Entitlement\CachedEntitlementProvider;
@@ -47,6 +49,13 @@ final class Pro {
 	 * Version.
 	 */
 	public const VERSION = '0.1.1';
+
+	/**
+	 * The free plugin.
+	 *
+	 * @var Plugin
+	 */
+	private Plugin $plugin;
 
 	/**
 	 * Where entitlement comes from.
@@ -105,6 +114,13 @@ final class Pro {
 	private NetworkDefaults $network;
 
 	/**
+	 * Pro's own admin screen.
+	 *
+	 * @var Screen
+	 */
+	private Screen $screen;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param Plugin                   $plugin      The free plugin.
@@ -116,6 +132,7 @@ final class Pro {
 		?EntitlementProvider $entitlement = null,
 		?CloudServiceClient $cloud = null
 	) {
+		$this->plugin      = $plugin;
 		$this->entitlement = $entitlement ?? self::defaultProvider();
 		$this->cloud       = $cloud ?? new HakeemifyCloudClient(
 			defined( 'DEBLOATER_PRO_CLOUD' ) && constant( 'DEBLOATER_PRO_CLOUD' ),
@@ -128,6 +145,7 @@ final class Pro {
 		$this->bulk    = new BulkApply( $plugin, $this->entitlement );
 		$this->channel = new RegistryChannel( $this->entitlement );
 		$this->network = new NetworkDefaults( $this->entitlement );
+		$this->screen  = new Screen( $this );
 	}
 
 	/**
@@ -156,6 +174,7 @@ final class Pro {
 	public function boot(): void {
 		$this->scans->boot();
 		$this->channel->boot();
+		$this->screen->boot();
 
 		add_action( 'admin_init', array( $this->scans, 'sync' ) );
 		add_filter( 'debloater_dashboard_panels', array( $this, 'panels' ) );
@@ -261,5 +280,38 @@ final class Pro {
 	 */
 	public function network(): NetworkDefaults {
 		return $this->network;
+	}
+
+	/**
+	 * The profiles this site knows about.
+	 *
+	 * Read from the free plugin's registry rather than listed here, so a
+	 * registry update that adds or removes one is reflected without Pro
+	 * knowing anything about it.
+	 *
+	 * @return array<string,mixed>
+	 */
+	public function profiles(): array {
+		return $this->plugin->registry()->profiles();
+	}
+
+	/**
+	 * Recent applies, newest first.
+	 *
+	 * @param int $limit How many.
+	 * @return array<int,\Debloater\Contracts\Run>
+	 */
+	public function appliedRuns( int $limit = 10 ): array {
+		return $this->plugin->runs()->recent( $limit, RunType::APPLY );
+	}
+
+	/**
+	 * One apply's before/after report, as HTML.
+	 *
+	 * @param int $run_id Run to report on.
+	 * @return string
+	 */
+	public function renderReport( int $run_id ): string {
+		return $this->report->render( $run_id );
 	}
 }
