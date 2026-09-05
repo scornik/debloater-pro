@@ -1,15 +1,16 @@
 name: CI
 
-# Pro's own tests, and the invariant that Pro adds nothing to the free plugin.
+# Pro's own tests, the invariant that Pro adds nothing to the free plugin, and
+# the rule that nothing secret is committed.
 #
-# The second one needs both trees. The free plugin is a separate private
-# repository, so this checks it out with a token when one is configured, and
-# runs without it when there is not — in which case the six cross-tree tests
-# skip and say so in the log. They are never quietly dropped: a green tick
-# earned by not looking is the failure this whole file exists to prevent.
+# Two of these need both trees. The free plugin is a separate private
+# repository, so it is checked out with a token when one is configured, and the
+# jobs say plainly what they could not check when there is not. They are never
+# quietly dropped: a green tick earned by not looking is the failure this file
+# exists to prevent.
 #
-# To make them run here, add a secret named FREE_PLUGIN_TOKEN holding a token
-# with read access to scornik/debloater.
+# To make them run, add a secret named FREE_PLUGIN_TOKEN holding a token with
+# read access to scornik/debloater.
 
 on:
   push:
@@ -95,6 +96,20 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
+        with:
+          path: debloater-pro
+
+      # PHPStan needs it for the same reason the tests do, and for a different
+      # purpose: Pro names types that belong to the free plugin, and without
+      # them level 6 reports several hundred unknown classes, every one of them
+      # meaning "the other repository is not here".
+      - name: The free plugin, when a token allows it
+        continue-on-error: true
+        uses: actions/checkout@v5
+        with:
+          repository: scornik/debloater
+          token: ${{ secrets.FREE_PLUGIN_TOKEN }}
+          path: debloater
 
       - uses: shivammathur/setup-php@v2
         with:
@@ -102,13 +117,25 @@ jobs:
           extensions: json, sodium
           coverage: none
 
-      - run: composer install --no-interaction --no-progress
+      - name: Install
+        working-directory: debloater-pro
+        run: composer install --no-interaction --no-progress
 
+      # Reads Pro alone, so it runs whether or not the free plugin is here.
       - name: PHPCS
+        working-directory: debloater-pro
         run: vendor/bin/phpcs
 
       - name: PHPStan
-        run: vendor/bin/phpstan analyse --no-progress
+        working-directory: debloater-pro
+        run: |
+          if [ ! -f ../debloater/debloater.php ]; then
+            echo "::warning::No FREE_PLUGIN_TOKEN, so the free plugin is absent."
+            echo "::warning::PHPStan needs it to resolve the types Pro shares with it, and did not run."
+            exit 0
+          fi
+
+          vendor/bin/phpstan analyse --no-progress --memory-limit=1G
 
   secrets:
     name: Nothing secret ships
@@ -120,19 +147,68 @@ jobs:
 
       # BUILD-SPEC §13 rule 15. Pro is the half of this product that talks to a
       # payment platform, so it is the half where a key would end up.
+      #
+      # The patterns below want a *value*, not a mention. The first version
+      # searched for the bare strings `sk_live`, `secret_key` and `SECRET_KEY`,
+      # and failed on the two files that spell those patterns out: this workflow
+      # and tests/Pro/ProArchitectureTest.php, which contains the same check as
+      # a PHPUnit test. Neither held a secret. A scanner that reports its own
+      # pattern list has found nothing, and teaches everybody to ignore it.
+      #
+      # `sk_live` is not a secret. `sk_live_` followed by sixteen characters is.
+      # That distinction removes the false positives without removing a single
+      # pattern, and the same rule is what the architecture test already uses.
       - name: No private keys or store secrets
         run: |
+          set -o pipefail
+
+          # A value-bearing token, a private key with a body, or an assignment
+          # of a store secret to something that is not a placeholder.
+          patterns=(
+            '(sk_live|sk_test|pk_live|rk_live|ghp_|gho_|github_pat_)[A-Za-z0-9_]{16}'
+            '-----BEGIN [A-Z ]*PRIVATE KEY-----'
+            "(SECRET_KEY|secret_key)['\"]?[[:space:]]*[=:>][[:space:]]*['\"][A-Za-z0-9_/+-]{12}"
+          )
+
+          # Exactly two files are exempt, by full path, because they are where
+          # the patterns are written down. Nothing else is exempt, and both are
+          # required to exist so that renaming one cannot widen this quietly.
+          for defining in .github/workflows/ci.yml tests/Pro/ProArchitectureTest.php; do
+            if [ ! -f "$defining" ]; then
+              echo "::error::$defining is exempt from the secret scan but does not exist."
+              echo "::error::Either restore it or remove it from the exemption below."
+              exit 1
+            fi
+          done
+
           found=0
 
-          if grep -rIl -e '-----BEGIN' -e 'sk_live' -e 'secret_key' -e 'SECRET_KEY' \
-              --exclude-dir=.git --exclude-dir=vendor . ; then
-            echo "::error::Something that looks like a secret is committed."
-            found=1
-          fi
+          for pattern in "${patterns[@]}"; do
+            # -e, because a pattern starting with "-----" is otherwise read
+            # as a bundle of options. The private-key check silently never ran
+            # until a fail-probe planted a real key and the guard said CLEAN.
+            hits=$(grep -rInIE -e "$pattern" \
+                     --exclude-dir=.git --exclude-dir=vendor --exclude-dir=node_modules . \
+                   | grep -v '^\./\.github/workflows/ci\.yml:' \
+                   | grep -v '^\./tests/Pro/ProArchitectureTest\.php:' || true)
 
+            if [ -n "$hits" ]; then
+              echo "::error::A value matching a secret pattern is committed:"
+              echo "$hits"
+              found=1
+            fi
+          done
+
+          # The store's own configuration, which holds identifiers that must not
+          # be published. .distignore excludes it from packages; this keeps it
+          # out of the repository in the first place.
           if [ -f config/freemius.php ]; then
             echo "::error::config/freemius.php is committed; it holds store identifiers."
             found=1
+          fi
+
+          if [ "$found" -eq 0 ]; then
+            echo "No private keys, tokens or store secrets are committed."
           fi
 
           exit $found

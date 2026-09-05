@@ -1,5 +1,46 @@
+includes:
+	- vendor/szepeviktor/phpstan-wordpress/extension.neon
+
 parameters:
-    level: 6
-    paths:
-        - src
-    treatPhpDocTypesAsCertain: false
+	level: 6
+
+	paths:
+		- debloater-pro.php
+		- src
+
+	# Pro names types that belong to the free plugin — Run, Context, PlanResult,
+	# Plugin itself — because that is what extending it through documented hooks
+	# looks like from this side. Those classes are in the other repository, so
+	# analysis has to be shown where it is checked out.
+	#
+	# scanDirectories, not paths: these files are read for their symbols and are
+	# not analysed here. They are analysed in their own repository, by their own
+	# configuration, and reporting on them from here would mean two verdicts on
+	# one file.
+	#
+	# The path is a sibling checkout, which is the layout README.md describes and
+	# the one CI creates. When it is absent, `composer analyse` says so rather
+	# than reporting several hundred unknown-class errors that all mean "the
+	# other repository is not here".
+	scanDirectories:
+		- ../debloater/src
+
+	scanFiles:
+		- ../debloater/debloater.php
+
+	excludePaths:
+		analyse:
+			- vendor (?)
+
+	bootstrapFiles:
+		- tests/phpstan-bootstrap.php
+
+	# Defined by wp-config.php on a real site, or not at all. Without this,
+	# analysis reasons from the placeholder values in the bootstrap file and
+	# reports every guard against them as dead code.
+	dynamicConstantNames:
+		- WP_FS__DEV_MODE
+		- DEBLOATER_PRO_FIXTURE
+		- DEBLOATER_VERSION
+
+	treatPhpDocTypesAsCertain: false
