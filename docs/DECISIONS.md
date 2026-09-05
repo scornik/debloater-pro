@@ -2768,7 +2768,7 @@ missing.
 
 - **Phase:** 18b
 - **Date:** 2026-09-04
-- **Status:** accepted, with one open item
+- **Status:** superseded by D-0056 (2026-09-05)
 - **Amends:** D-0052
 
 ### Decision
@@ -2806,6 +2806,8 @@ Option 1 is the better trade and gives up almost nothing. It is not applied
 here because the title is a naming decision and the brief for this phase was
 explicit that the full title stays in the readme. Recorded rather than decided
 unilaterally.
+
+**Resolved:** option 1, on the naming decision being made. See D-0056.
 
 ---
 
@@ -2868,3 +2870,53 @@ The option keeps its `_transient_` name so `delete_transient()` in
 - No "clear the lock" button was added. With a real expiry the lock self-heals
   in a minute, and a button that lets somebody break a genuinely running apply
   is a worse failure than the one it would fix.
+
+---
+
+## D-0056 – one name in both files, and the tagline where it is read
+
+- **Phase:** 18e
+- **Date:** 2026-09-05
+- **Status:** accepted
+- **Supersedes:** D-0054
+
+### Context
+
+D-0054 left one thing open: the plugin header said `Debloater` and the readme
+title said `Debloater – Scan, Fix & Undo Site Bloat`, and Plugin Check reports
+that disagreement as `mismatched_plugin_name`. It recorded two ways out and
+took neither, because which name a product carries is not a decision to make
+without being asked. Asked, and option 1 taken.
+
+### Decision
+
+**Both files carry `Debloater` and nothing else.**
+
+The slug argument from D-0054 is unchanged and still the reason the header is
+the short name: wordpress.org derives the slug from `Plugin Name`, and a
+permanent `debloater-scan-fix-undo-site-bloat` is not recoverable after
+publication. What D-0054 got wrong was treating the readme title as a display
+string that could differ. Plugin Check reads it as a plugin name.
+
+**The tagline becomes the short description**, which is the line wordpress.org
+puts under a plugin's name in search results and on the plugin page – so it is
+read more, not less, than the title line it left:
+
+> Scan, fix and undo site bloat: audits your site against the facts, applies
+> only what you approve, with a recovery point and automatic rollback.
+
+143 characters, inside the 150 wordpress.org allows.
+
+`Brand::FULL_TITLE` stays and still titles the admin screen. There it is a
+heading on a page, not a name anything derives a slug or an identity from, and
+nothing checks it against the header.
+
+### Consequences
+
+- Plugin Check: no errors, no warnings.
+- `ReleaseReadinessTest` asserted the mismatch as though it were the
+  requirement – the suite was green while wordpress.org's own checker was not.
+  It now asserts the header and the readme title are identical, and that the
+  short description exists, fits, and still carries the tagline.
+- The name in the menu, the slug, the text domain and the REST namespace are
+  all unchanged. Nothing a site has installed is affected.
