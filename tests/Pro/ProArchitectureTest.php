@@ -76,7 +76,7 @@ final class ProArchitectureTest extends TestCase {
 		// the adapter having been deleted.
 		$this->assertStringContainsString(
 			'freemius',
-			strtolower( (string) file_get_contents( $this->path( $adapter ) ) )
+			strtolower( (string) file_get_contents( $this->path( 'src/Entitlement/FreemiusEntitlementProvider.php' ) ) )
 		);
 	}
 
@@ -186,12 +186,12 @@ final class ProArchitectureTest extends TestCase {
 	 */
 	public function test_pro_adds_no_tweaks_and_no_handlers(): void {
 		$this->assertDirectoryDoesNotExist(
-			$this->path( 'pro/runtime-handlers' ),
+			$this->path( 'runtime-handlers' ),
 			'Pro must not ship runtime handlers: what runs on a site is the free plugin.'
 		);
 
 		$this->assertDirectoryDoesNotExist(
-			$this->path( 'pro/registry' ),
+			$this->path( 'registry' ),
 			'Pro must not ship a registry: the change list is the free plugin.'
 		);
 
@@ -310,23 +310,102 @@ final class ProArchitectureTest extends TestCase {
 		$files = array();
 		$root  = str_replace( '\\', '/', (string) realpath( $this->path( '' ) ) );
 
-		foreach ( array( 'src', 'runtime-handlers', 'mu-loader', 'pro' ) as $directory ) {
-			$iterator = new \RecursiveIteratorIterator(
-				new \RecursiveDirectoryIterator( $this->path( $directory ), \FilesystemIterator::SKIP_DOTS )
-			);
+		// Pro's own tree, at this repository's root, and the free plugin's if
+		// it is beside this one. The free half is what makes the invariant
+		// mean anything: "Pro adds no tweaks and no safety features" is a
+		// claim about the two together and cannot be checked against Pro
+		// alone.
+		// Refused rather than half-done. Every invariant asked of this list is
+		// a claim about Pro *and* the free plugin together — "adds no tweaks",
+		// "adds no safety features", "names the licensing platform in one
+		// place". Scanning Pro alone answers all of them affirmatively and
+		// proves none of them, which is worse than not running: it is a green
+		// tick for a question nobody asked.
+		$free  = $this->requireFreePlugin();
+		$trees = array(
+			$root => array( 'src' ),
+			$free => array( 'src', 'runtime-handlers', 'mu-loader' ),
+		);
 
-			foreach ( $iterator as $file ) {
-				if ( ! $file instanceof \SplFileInfo || 'php' !== $file->getExtension() ) {
+		foreach ( $trees as $base => $directories ) {
+			foreach ( $directories as $directory ) {
+				$where = $base . '/' . $directory;
+
+				if ( ! is_dir( $where ) ) {
 					continue;
 				}
 
-				$relative = substr( str_replace( '\\', '/', $file->getPathname() ), strlen( $root ) + 1 );
+				$iterator = new \RecursiveIteratorIterator(
+					new \RecursiveDirectoryIterator( $where, \FilesystemIterator::SKIP_DOTS )
+				);
 
-				$files[ $relative ] = (string) file_get_contents( $file->getPathname() );
+				foreach ( $iterator as $file ) {
+					if ( ! $file instanceof \SplFileInfo || 'php' !== $file->getExtension() ) {
+						continue;
+					}
+
+					$path = str_replace( '\\', '/', $file->getPathname() );
+					$key  = ( $base === $root ? 'pro/' : 'free/' ) . substr( $path, strlen( $base ) + 1 );
+
+					$files[ $key ] = (string) file_get_contents( $file->getPathname() );
+				}
 			}
 		}
 
 		return $files;
+	}
+
+	/**
+	 * Where the free plugin is checked out, or null when it is not.
+	 *
+	 * Pro and Debloater are separate repositories now, so the free tree is not
+	 * here by default. `DEBLOATER_FREE_PATH` names it; failing that, a sibling
+	 * checkout is assumed, which is the layout README.md describes.
+	 *
+	 * @return string|null
+	 */
+	private static function freePluginRoot(): ?string {
+		$candidates = array();
+		$named      = getenv( 'DEBLOATER_FREE_PATH' );
+
+		if ( is_string( $named ) && '' !== $named ) {
+			$candidates[] = $named;
+		}
+
+		$candidates[] = dirname( __DIR__, 3 ) . '/debloater';
+
+		foreach ( $candidates as $candidate ) {
+			$resolved = realpath( $candidate );
+
+			if ( false !== $resolved && is_file( $resolved . '/debloater.php' ) ) {
+				return str_replace( '\\', '/', $resolved );
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Skip loudly when the free plugin is not beside this one.
+	 *
+	 * A silent pass would be the worst outcome available here. This file exists
+	 * to assert that Pro adds nothing to what Debloater does to a site, and a
+	 * green tick earned by not looking is a lie told once per run.
+	 *
+	 * @return string
+	 */
+	private function requireFreePlugin(): string {
+		$root = self::freePluginRoot();
+
+		if ( null === $root ) {
+			$this->markTestSkipped(
+				'The free plugin is not checked out beside this repository, so the '
+				. 'invariant that Pro adds nothing to it could not be checked. Clone '
+				. 'scornik/debloater as a sibling directory, or set DEBLOATER_FREE_PATH.'
+			);
+		}
+
+		return (string) $root;
 	}
 
 	/**
@@ -336,6 +415,9 @@ final class ProArchitectureTest extends TestCase {
 	 * @return string
 	 */
 	private function path( string $relative ): string {
+		// Two levels up from tests/Pro/ is this repository's root, which is
+		// where Pro's own src/ now lives: it was `pro/src/` when this file sat
+		// in the plugin's tree, and the split moved pro/ to the root.
 		return dirname( __DIR__, 2 ) . '/' . $relative;
 	}
 }

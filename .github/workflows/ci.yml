@@ -1,0 +1,138 @@
+name: CI
+
+# Pro's own tests, and the invariant that Pro adds nothing to the free plugin.
+#
+# The second one needs both trees. The free plugin is a separate private
+# repository, so this checks it out with a token when one is configured, and
+# runs without it when there is not — in which case the six cross-tree tests
+# skip and say so in the log. They are never quietly dropped: a green tick
+# earned by not looking is the failure this whole file exists to prevent.
+#
+# To make them run here, add a secret named FREE_PLUGIN_TOKEN holding a token
+# with read access to scornik/debloater.
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Tests (PHP ${{ matrix.php }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    strategy:
+      fail-fast: false
+      matrix:
+        php: [ '8.1', '8.2', '8.3' ]
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: debloater-pro
+
+      # Beside this one, which is the layout the tests look for and the layout
+      # README.md tells a person to use.
+      - name: The free plugin, when a token allows it
+        id: free
+        continue-on-error: true
+        uses: actions/checkout@v5
+        with:
+          repository: scornik/debloater
+          token: ${{ secrets.FREE_PLUGIN_TOKEN }}
+          path: debloater
+
+      - name: Say whether the cross-tree invariants can run
+        run: |
+          if [ -f debloater/debloater.php ]; then
+            echo "The free plugin is checked out; the invariant tests will run."
+          else
+            echo "::warning::No FREE_PLUGIN_TOKEN, so the free plugin is absent."
+            echo "::warning::The six tests asserting Pro adds nothing to it will skip."
+          fi
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: json, sodium
+          coverage: none
+
+      - name: Install
+        working-directory: debloater-pro
+        run: composer install --no-interaction --no-progress
+
+      - name: Pro's suite
+        working-directory: debloater-pro
+        run: vendor/bin/phpunit --testsuite=pro
+
+      # A skip is a legitimate outcome above and a mistake here. If the free
+      # plugin was checked out, the invariants must have actually run.
+      - name: The invariants ran, if they could
+        working-directory: debloater-pro
+        run: |
+          if [ ! -f ../debloater/debloater.php ]; then
+            echo "The free plugin was not available; nothing to confirm."
+            exit 0
+          fi
+
+          output=$(vendor/bin/phpunit --testsuite=pro 2>&1)
+          echo "$output"
+
+          if echo "$output" | grep -q "Skipped"; then
+            echo "::error::The free plugin was present and tests skipped anyway."
+            exit 1
+          fi
+
+  static:
+    name: Static analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: json, sodium
+          coverage: none
+
+      - run: composer install --no-interaction --no-progress
+
+      - name: PHPCS
+        run: vendor/bin/phpcs
+
+      - name: PHPStan
+        run: vendor/bin/phpstan analyse --no-progress
+
+  secrets:
+    name: Nothing secret ships
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v5
+
+      # BUILD-SPEC §13 rule 15. Pro is the half of this product that talks to a
+      # payment platform, so it is the half where a key would end up.
+      - name: No private keys or store secrets
+        run: |
+          found=0
+
+          if grep -rIl -e '-----BEGIN' -e 'sk_live' -e 'secret_key' -e 'SECRET_KEY' \
+              --exclude-dir=.git --exclude-dir=vendor . ; then
+            echo "::error::Something that looks like a secret is committed."
+            found=1
+          fi
+
+          if [ -f config/freemius.php ]; then
+            echo "::error::config/freemius.php is committed; it holds store identifiers."
+            found=1
+          fi
+
+          exit $found

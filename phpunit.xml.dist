@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<phpunit
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+	bootstrap="tests/bootstrap-pro.php"
+	colors="true"
+	failOnWarning="true"
+	failOnRisky="true"
+	beStrictAboutOutputDuringTests="true"
+	cacheDirectory=".phpunit.cache"
+>
+	<testsuites>
+		<!--
+			Pro's WordPress-free tests. They import nothing from the free
+			plugin, which is not an accident: Pro extends Debloater through
+			hooks it documents rather than by calling into its classes, so its
+			own units can be tested with nothing else installed.
+
+			The integration tests are a separate suite because they need a
+			WordPress and the free plugin. See README.md.
+		-->
+		<testsuite name="pro">
+			<directory>tests/Pro</directory>
+		</testsuite>
+	</testsuites>
+
+	<source>
+		<include>
+			<directory>src</directory>
+		</include>
+	</source>
+</phpunit>
