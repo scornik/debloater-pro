@@ -129,7 +129,7 @@ Stripped before transmission, and asserted by a test when this is built:
 The transmitted payload is built by naming what goes, not by deleting what does
 not. A deny-list fails open: the next field somebody adds to a fact ships by
 default, and nobody notices for a year. This is the same reasoning as the zip
-builder's ship list (`tools/build-zip.mjs`), and for the same reason.
+builder's ship list (`scripts/plugin-zip.mjs`), and for the same reason.
 
 ---
 

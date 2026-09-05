@@ -2745,7 +2745,7 @@ named for the slug.
 
 ### How it is held
 
-`tests/packaging/zip.test.mjs` parses the **central directory bytes** rather
+`tests/Packaging/zip.test.mjs` parses the **central directory bytes** rather
 than asking a library for the names, because a test that reads through the same
 normalisation as the bug cannot see the bug. It then extracts the archive inside
 a Linux container and asserts WordPress activates the result.
@@ -2920,3 +2920,60 @@ nothing checks it against the header.
   short description exists, fits, and still carries the tagline.
 - The name in the menu, the slug, the text domain and the REST namespace are
   all unchanged. Nothing a site has installed is affected.
+
+---
+
+## D-0057 – an allow-list decides what ships, `.distignore` can only remove
+
+- **Phase:** 19b, part 1
+- **Date:** 2026-09-05
+- **Status:** accepted
+- **Relates to:** D-0053 (portable packaging)
+
+### Context
+
+The brief for this phase asked for `.distignore` at each plugin root to be the
+**only** include/exclude source. The builder instead keeps an explicit ship
+list per plugin and applies `.distignore` on top of it. That is a deviation
+from an instruction, so it is written down here rather than left in the code
+for somebody to find.
+
+### Decision
+
+**`.distignore` moves to each plugin root and becomes the single exclusion
+source**, which is the part of the brief that was missing: the builder read the
+repository's `.distignore` and applied it to both plugins, so Pro was measured
+against patterns written relative to a different directory. `pro/.distignore`
+now exists and each plugin is read against its own root. A plugin root without
+one is refused rather than silently packaged.
+
+**The ship list stays.** What goes in is named; `.distignore` can only take
+away.
+
+### Why not a deny-list alone
+
+A deny-list ships everything it does not name. This repository's root holds
+`node_modules/`, a `vendor/` with forty development packages, `tests/`,
+`admin-ui/`, `docs/` and `dist/`. Under a deny-list, one missing line is a
+release containing them – and the failure is silent: the zip installs, the
+plugin works, and only the file size or a reviewer ever says otherwise.
+
+The free plugin ships nine named files out of `vendor/`. Writing "these nine
+and nothing else" as exclusions means listing every package present today and
+every one added later, and getting it wrong the first time somebody runs
+`composer require`.
+
+An allow-list fails the other way round. A file that should ship and was not
+listed is *missing*, and the plugin breaks loudly on the first install – which
+is the direction to fail in when the alternative is a quiet, shipped mistake.
+This is also the arrangement that has held since D-0053; the zip that could not
+be installed predates it.
+
+### Consequences
+
+- `.distignore` is honoured, per plugin root, and its absence is an error.
+- Anything genuinely new that must ship has to be added to the ship list. That
+  is the cost, and it is paid at build time with a message naming the file.
+- If the single-source rule is wanted anyway, the change is confined to
+  `collect()` in `scripts/plugin-zip.mjs`. It is not a redesign – it is a
+  deliberate refusal, and reversible in one function.
