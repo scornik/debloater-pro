@@ -1001,6 +1001,13 @@ in "we could not tell" is worse than a one-second one.
 - A probe that throws is also UNKNOWN, for the same reason: our bug is not
   evidence about their site.
 
+**Amended in 19b-1b.** This decision covers a site that cannot reach itself. It
+was also, wrongly, the outcome on sites whose loopback worked perfectly: the
+admin probe sent the wrong cookie, was answered with the login form, and
+reported UNKNOWN under this rule @@ so no apply on any site ever reached
+`VERIFIED`. The rule is unchanged and was never the problem; what was missing
+was the credential. See D-0058.
+
 ---
 
 ## D-0021 — `--format=json`, with `--json` as the spelling everyone uses
@@ -2977,3 +2984,86 @@ be installed predates it.
 - If the single-source rule is wanted anyway, the change is confined to
   `collect()` in `scripts/plugin-zip.mjs`. It is not a redesign – it is a
   deliberate refusal, and reversible in one function.
+
+---
+
+## D-0058 – the admin probe carries the cookie the admin actually reads
+
+- **Phase:** 19b, part 1b
+- **Date:** 2026-09-05
+- **Status:** accepted
+- **Spec:** §11 (`admin` – GET `/wp-admin/` **with cookie of actor**)
+- **Amends:** D-0019, D-0020
+
+### Context
+
+Reported from a live site: every apply ended `VERIFIED_WITH_WARNINGS`, with
+
+> The dashboard answered with the login form, so this check could not confirm
+> whether it renders.
+
+The brief for this phase named the cause as "`Verify\HttpClient` sends no
+authentication for the acting user". That is not what was wrong. `ActorSession`
+already existed, already minted a credential against a real session token,
+already forwarded the caller's own cookie when there was one, and already
+destroyed what it created. The probe was authenticating.
+
+It was authenticating with the wrong cookie, and the reason is not obvious.
+`auth_redirect()` guards `/wp-admin/` and calls `wp_validate_auth_cookie( '', '' )`.
+An **empty scheme** is resolved by `wp_parse_auth_cookie()` to `secure_auth`
+under TLS and to `auth` otherwise – and never to `logged_in`. So the dashboard
+reads `AUTH_COOKIE` or `SECURE_AUTH_COOKIE`, and a request carrying only
+`LOGGED_IN_COOKIE` is anonymous to it however valid that cookie is.
+
+### Decision
+
+**Both cookies are sent, bound to the same session token.**
+
+- `LOGGED_IN_COOKIE` stays: it is what `wp_get_current_user()` reads, so it is
+  what makes the page render *as the actor* rather than merely letting the
+  request through.
+- The admin cookie is minted for the scheme **the target URL** needs, not the
+  scheme of the request doing the verifying: `force_ssl_admin()` can put the
+  admin behind https while the run that triggered it arrived over http.
+- Only the matching one is sent. A `secure_auth` credential put on a plaintext
+  request is a credential minted for TLS and then sent without it.
+- Both name the same session token, because `wp_validate_auth_cookie()` checks
+  the token against the user's live sessions and a cookie naming a session that
+  does not exist is refused however well-formed it is.
+- Nothing is persisted. The cookies are built per request, the minted session is
+  destroyed when verification finishes, and no cookie value reaches a journal
+  row, a run payload or a log – asserted, not assumed.
+
+**A credential never leaves the cookie domain.** `COOKIE_DOMAIN`, or the site's
+own host when that is unset, decides. A browser would not send this site's
+credentials elsewhere and neither does this, however the URL came to point
+off-site.
+
+**Redirects are not followed, so the two failures stay distinguishable.**
+
+| What comes back | What it means | Reported as |
+|---|---|---|
+| 302 to `wp-login.php` | core read the cookie and refused it | UNKNOWN, naming the scheme |
+| 200 with a login form | something in front of core stripped the cookie | UNKNOWN, naming that |
+| 200 with admin markers but no admin bar | rendered, but not for anybody | WARN |
+| 200 with both | the dashboard, signed in | PASS |
+
+Following the redirect turns the first into the second, which is how a specific
+diagnosis becomes a vague one. A status code alone settles neither: the second
+arrives as an ordinary 200.
+
+### Consequences
+
+- A site with working loopback now reaches `VERIFIED` rather than
+  `VERIFIED_WITH_WARNINGS`, which is what §11 always described.
+- D-0019's admin markers gain `Markers::ADMIN_BAR`. Six fixtures modelled a
+  dashboard with `wpbody` and `adminmenu` and no admin bar – a page core does
+  not serve to a signed-in user. They were corrected rather than the assertion
+  weakened.
+- A site that hides the admin bar inside `/wp-admin/` will WARN rather than
+  PASS. That is the deliberate asymmetry from D-0019: the message names the
+  missing marker, and a warning costs a sentence where a wrong PASS costs the
+  truth.
+- The brief asked for this to be recorded against D-0009. D-0009 is about Docker
+  DNS on the build machine and has nothing to do with probes; the decisions this
+  actually amends are D-0019 and D-0020, and they say so.
