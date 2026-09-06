@@ -171,3 +171,24 @@ token, no `continue-on-error`, and no job that can report success without
 having looked — which is what the first three used to do, every run, because
 the `FREE_PLUGIN_TOKEN` they asked for was never configured. See
 `docs/DECISIONS.md` D-0065.
+
+### Push the free repository first
+
+Every job above checks out **`scornik/debloater` at `main`**, not at a pinned
+commit. So when a change here depends on something new in the free plugin — a
+class, a hook, a query argument — Pro's CI cannot pass until that change is on
+the free plugin's `main`.
+
+Push the free repository first. Always, even when the Pro change looks
+self-contained and the free change looks trivial.
+
+This is not hypothetical. `cd5bf84` added the profiles panel, which uses
+`Debloater\Config\Profile` and `ProfileStore`. Those classes were committed in
+the free repository but not yet pushed, so Pro's CI checked out a `main` that
+did not have them and Static analysis reported about forty unknown-class errors
+— every one of them meaning "the other repository has not caught up", and none
+of them saying so.
+
+Tracking `main` is the deliberate choice: pinning a commit would let the two
+drift while both reported green, which is the failure this workflow exists to
+prevent. The cost is this ordering rule, and the rule is cheaper than the drift.
