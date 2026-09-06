@@ -3368,10 +3368,29 @@ private sibling checkout; a tracked mapping to `../debloater-pro` would make
 `wp-env start` fail for everyone else. `.wp-env.override.json` is gitignored
 there and `.distignore` already excludes it from the package.
 
-### It is still not in CI
+### It runs in CI
 
-Pro's CI has no WordPress, so this suite runs locally and before a release, not
-on every push — the same arrangement as before the split. That is a known gap
-rather than a hidden one, and the architecture invariants in `tests/Pro`, which
-*do* run on every push, are the ones that guard the properties worth guarding
-automatically.
+Added after the fact, as the `Integration (Pro + Debloater)` job. It checks out
+both repositories, installs both, downloads the PHPUnit 9 phar, generates the
+mapping by copying the free plugin's committed `.wp-env.override.json.dist`,
+starts wp-env and runs `npm run test:integration:pro` — the same command a
+person runs here, rather than a CI-shaped imitation of it that can drift.
+
+Pro is mapped but deliberately **not activated**. Its entry point initialises
+the licensing SDK, which on activation reaches for a network these tests do not
+need and CI should not depend on. Every test in the suite constructs Pro
+directly — `new Pro( $plugin, FixtureEntitlementProvider::everything() )` — so
+the mapping only has to make the files reachable.
+
+### The token that was never there
+
+The two jobs that need the free plugin used to check it out with
+`token: ${{ secrets.FREE_PLUGIN_TOKEN }}` and `continue-on-error: true`, because
+`scornik/debloater` was private. The secret was never configured. So the
+architecture invariants — the ones asserting Pro adds no tweaks, no runtime
+handlers and no safety features to Debloater — skipped on every run the workflow
+ever made, while the job reported success.
+
+The free plugin is public now, so both checkouts are unconditional, the token is
+gone, and a step asserts the tree is really there before the suite runs. A
+second step fails the build if anything skipped.

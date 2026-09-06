@@ -156,3 +156,18 @@ Because that page is stripped of the useful parts, Pro's own screen carries the
 plan, the licence state and a way to release the site. That is where to look,
 and it is the same on every licence.
 
+
+## CI
+
+| Job | Needs | What it proves |
+|---|---|---|
+| `Tests` | PHP, and the free plugin | Pro's units and the architecture invariants, on 8.1, 8.2 and 8.3 |
+| `Static analysis` | PHP, and the free plugin | PHPCS and PHPStan level 6 |
+| `Integration (Pro + Debloater)` | Docker, wp-env, both plugins | Pro against a real WordPress |
+| `Nothing secret ships` | nothing | no key, token or store secret is committed |
+
+The free plugin is checked out unconditionally. It is public, so there is no
+token, no `continue-on-error`, and no job that can report success without
+having looked — which is what the first three used to do, every run, because
+the `FREE_PLUGIN_TOKEN` they asked for was never configured. See
+`docs/DECISIONS.md` D-0065.

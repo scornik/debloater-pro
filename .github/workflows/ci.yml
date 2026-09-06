@@ -1,16 +1,15 @@
 name: CI
 
-# Pro's own tests, the invariant that Pro adds nothing to the free plugin, and
-# the rule that nothing secret is committed.
+# Pro's own tests, the invariant that Pro adds nothing to the free plugin, the
+# integration suite that runs both plugins in one WordPress, and the rule that
+# nothing secret is committed.
 #
-# Two of these need both trees. The free plugin is a separate private
-# repository, so it is checked out with a token when one is configured, and the
-# jobs say plainly what they could not check when there is not. They are never
-# quietly dropped: a green tick earned by not looking is the failure this file
-# exists to prevent.
-#
-# To make them run, add a secret named FREE_PLUGIN_TOKEN holding a token with
-# read access to scornik/debloater.
+# Three of these need both trees, and they get both. scornik/debloater is public
+# now, so it is checked out like any other public repository -- no token, no
+# `continue-on-error`, and no job that can pass by not looking. That was not
+# true when this file was written: the free plugin was private, the checkout
+# needed a FREE_PLUGIN_TOKEN nobody had configured, and the invariants asserting
+# "Pro adds nothing to Debloater" skipped on every run while reporting success.
 
 on:
   push:
@@ -39,23 +38,17 @@ jobs:
 
       # Beside this one, which is the layout the tests look for and the layout
       # README.md tells a person to use.
-      - name: The free plugin, when a token allows it
-        id: free
-        continue-on-error: true
+      - name: The free plugin
         uses: actions/checkout@v5
         with:
           repository: scornik/debloater
-          token: ${{ secrets.FREE_PLUGIN_TOKEN }}
           path: debloater
 
-      - name: Say whether the cross-tree invariants can run
-        run: |
-          if [ -f debloater/debloater.php ]; then
-            echo "The free plugin is checked out; the invariant tests will run."
-          else
-            echo "::warning::No FREE_PLUGIN_TOKEN, so the free plugin is absent."
-            echo "::warning::The six tests asserting Pro adds nothing to it will skip."
-          fi
+      # Required, not hoped for. Every invariant in tests/Pro is a claim about
+      # Pro *and* Debloater together; without the second tree they answer
+      # affirmatively and prove nothing.
+      - name: The free plugin is really here
+        run: test -f debloater/debloater.php
 
       - uses: shivammathur/setup-php@v2
         with:
@@ -71,21 +64,18 @@ jobs:
         working-directory: debloater-pro
         run: vendor/bin/phpunit --testsuite=pro
 
-      # A skip is a legitimate outcome above and a mistake here. If the free
-      # plugin was checked out, the invariants must have actually run.
-      - name: The invariants ran, if they could
+      # Nothing in this suite may skip. The free plugin is checked out
+      # unconditionally now, so a skip means a test looked for it somewhere it
+      # is not -- which is how ReadmeTest's "Tested up to" comparison sat out
+      # every run it was ever part of.
+      - name: Nothing skipped
         working-directory: debloater-pro
         run: |
-          if [ ! -f ../debloater/debloater.php ]; then
-            echo "The free plugin was not available; nothing to confirm."
-            exit 0
-          fi
-
           output=$(vendor/bin/phpunit --testsuite=pro 2>&1)
           echo "$output"
 
           if echo "$output" | grep -q "Skipped"; then
-            echo "::error::The free plugin was present and tests skipped anyway."
+            echo "::error::A test skipped even though the free plugin is present."
             exit 1
           fi
 
@@ -103,12 +93,10 @@ jobs:
       # purpose: Pro names types that belong to the free plugin, and without
       # them level 6 reports several hundred unknown classes, every one of them
       # meaning "the other repository is not here".
-      - name: The free plugin, when a token allows it
-        continue-on-error: true
+      - name: The free plugin
         uses: actions/checkout@v5
         with:
           repository: scornik/debloater
-          token: ${{ secrets.FREE_PLUGIN_TOKEN }}
           path: debloater
 
       - uses: shivammathur/setup-php@v2
@@ -128,14 +116,114 @@ jobs:
 
       - name: PHPStan
         working-directory: debloater-pro
-        run: |
-          if [ ! -f ../debloater/debloater.php ]; then
-            echo "::warning::No FREE_PLUGIN_TOKEN, so the free plugin is absent."
-            echo "::warning::PHPStan needs it to resolve the types Pro shares with it, and did not run."
-            exit 0
-          fi
+        run: vendor/bin/phpstan analyse --no-progress --memory-limit=1G
 
-          vendor/bin/phpstan analyse --no-progress --memory-limit=1G
+  # Pro against a real WordPress, with the free plugin active beside it.
+  #
+  # This is the job that did not exist. Splitting Pro out took the wp-env
+  # mapping and the PHPUnit suite with it, and tests/Integration came here with
+  # nothing anywhere able to run it -- so ProScreenTest and ProIntegrationTest
+  # were present, correct and uncollected for four commits. Not failing, not
+  # skipping: never run, which reads exactly like fine.
+  #
+  # Everything WordPress lives in the free plugin's checkout: its .wp-env.json,
+  # its PHPUnit 9 phar, its bootstrap. This job stands that environment up and
+  # points it at Pro's configuration, which is what a person does locally too --
+  # `npm run test:integration:pro`, the same script, so there is one path rather
+  # than a CI-shaped imitation of one.
+  #
+  # The mapping that puts Pro in the container is generated here from the
+  # template committed in the free repository. It is a template there rather
+  # than a default because wp-env can only map a directory that exists, and
+  # that repository has to start for people who do not have Pro.
+  integration:
+    name: Integration (Pro + Debloater)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: debloater-pro
+
+      - uses: actions/checkout@v5
+        with:
+          repository: scornik/debloater
+          path: debloater
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: debloater/package-lock.json
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: json, sodium
+          coverage: none
+
+      # Pro's autoloader. The suite constructs Pro's classes directly rather
+      # than loading debloater-pro.php, so this is all Pro needs.
+      - name: Install Pro
+        working-directory: debloater-pro
+        run: composer install --no-interaction --no-progress
+
+      - name: Install Debloater
+        working-directory: debloater
+        run: npm ci
+
+      # The WordPress test suite needs Yoast's PHPUnit Polyfills, a Composer dev
+      # dependency of the free plugin. Its directory is mapped into the
+      # container as-is, so a missing vendor/ here is a missing vendor/ there.
+      - name: Debloater's dev dependencies
+        working-directory: debloater
+        run: composer install --no-interaction --no-progress
+
+      # PHPUnit 9 for the WordPress test suite is a phar, downloaded rather than
+      # committed. WP_UnitTestCase is not compatible with PHPUnit 10.
+      - name: PHPUnit 9
+        working-directory: debloater
+        run: npm run test:integration:setup
+
+      # From the committed template, rather than written out here. Two copies of
+      # a mapping is two things to keep in step, and the template is the one a
+      # person reads.
+      - name: Map Pro into the environment
+        working-directory: debloater
+        run: |
+          cp .wp-env.override.json.dist .wp-env.override.json
+          cat .wp-env.override.json
+
+      - name: Start WordPress
+        working-directory: debloater
+        run: npx wp-env start --update
+
+      # wp-env activates the plugins listed in .wp-env.json. Debloater is
+      # mapped rather than listed, so on a fresh runner it is installed and
+      # inactive.
+      #
+      # Pro is deliberately *not* activated. Its entry point initialises the
+      # licensing SDK, which on activation reaches for a network these tests do
+      # not need and CI should not depend on. The suite constructs Pro's classes
+      # directly -- `new Pro( $plugin, FixtureEntitlementProvider::everything() )`
+      # -- which is what every one of these tests already does, and the reason
+      # the mapping only has to make the files reachable.
+      - name: Activate Debloater
+        working-directory: debloater
+        run: npx wp-env run cli wp plugin activate debloater
+
+      # The same command a person runs. It refuses, with an explanation, when
+      # the mapping is missing -- so a broken environment here says why rather
+      # than failing about a path inside a container.
+      - name: Pro's integration suite
+        working-directory: debloater
+        run: npm run test:integration:pro
+
+      - name: Stop WordPress
+        working-directory: debloater
+        if: always()
+        run: npx wp-env stop
 
   secrets:
     name: Nothing secret ships

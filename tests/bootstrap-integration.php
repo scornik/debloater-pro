@@ -39,12 +39,27 @@ if ( ! is_string( $debloater_free_dir ) || '' === $debloater_free_dir ) {
 }
 
 if ( ! is_readable( $debloater_free_dir . '/debloater.php' ) ) {
+	// Fails, and does not skip. Everything in this suite is a claim about what
+	// Pro does to a site running Debloater; without Debloater there is nothing
+	// to make the claim against, and a green tick earned by not looking is the
+	// outcome this project treats as worse than a red one.
 	fwrite(
 		STDERR,
-		"The free plugin was not found at {$debloater_free_dir}.\n\n"
+		"\nThe free plugin is not here.\n\n"
+		. "Looked for debloater.php in:\n"
+		. "  {$debloater_free_dir}\n\n"
 		. "Pro's integration tests assert what Pro does to a site running Debloater,\n"
-		. "so without it there is nothing to assert against. Check out scornik/debloater\n"
-		. "beside this repository, or set DEBLOATER_FREE_PATH.\n\n"
+		. "so without it there is nothing to assert against. They fail rather than\n"
+		. "skip, deliberately.\n\n"
+		. "Inside wp-env this means the Pro checkout is not mapped into the container.\n"
+		. "The mapping is not in the free plugin's .wp-env.json -- that repository is\n"
+		. "public and has to start on a machine with no Pro beside it -- so it is a\n"
+		. "template there instead:\n\n"
+		. "  cp .wp-env.override.json.dist .wp-env.override.json   (in the free plugin)\n"
+		. "  npm run env:start                                     (restart, to apply it)\n"
+		. "  npm run test:integration:pro\n\n"
+		. "Outside a container, check out scornik/debloater beside this repository or\n"
+		. "set DEBLOATER_FREE_PATH to wherever it is.\n\n"
 	);
 	exit( 1 );
 }
