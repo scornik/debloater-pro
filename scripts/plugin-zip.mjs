@@ -108,6 +108,7 @@ const PLUGINS = {
 		requiresBuild: false,
 		ship: [
 			{ from: 'debloater-pro.php' },
+			{ from: 'readme.txt' },
 			{ from: 'src' },
 			{ from: 'config/freemius.php.dist' },
 
