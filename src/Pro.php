@@ -9,6 +9,7 @@ declare( strict_types = 1 );
 
 namespace Debloater\Pro;
 
+use Debloater\Config\ProfileStore;
 use Debloater\Contracts\RunState;
 use Debloater\Contracts\RunType;
 use Debloater\Plugin;
@@ -294,6 +295,21 @@ final class Pro {
 	 */
 	public function profiles(): array {
 		return $this->plugin->registry()->profiles();
+	}
+
+	/**
+	 * Saved and built-in profiles, from the free plugin.
+	 *
+	 * Pro keeps no profile store of its own, and this is what stops it growing
+	 * one. A profile saved on Debloater's screen, one imported from a file and
+	 * one renamed in Pro's panel are the same row in the same option, because
+	 * there is one place they are kept and this is a handle on it rather than
+	 * a copy of it.
+	 *
+	 * @return ProfileStore
+	 */
+	public function profileStore(): ProfileStore {
+		return new ProfileStore( $this->plugin->registry() );
 	}
 
 	/**

@@ -61,12 +61,20 @@ final class Screen {
 	private Pro $pro;
 
 	/**
+	 * The profiles panel, which handles its own posts.
+	 *
+	 * @var ProfilesPanel
+	 */
+	private ProfilesPanel $profiles;
+
+	/**
 	 * Constructor.
 	 *
 	 * @param Pro $pro Pro.
 	 */
 	public function __construct( Pro $pro ) {
-		$this->pro = $pro;
+		$this->pro      = $pro;
+		$this->profiles = new ProfilesPanel( $pro );
 	}
 
 	/**
@@ -78,6 +86,8 @@ final class Screen {
 		add_action( 'admin_menu', array( $this, 'registerMenu' ), 11 );
 		add_action( 'admin_post_' . self::ACTION, array( $this, 'handlePost' ) );
 		add_action( 'admin_post_' . self::REPORT, array( $this, 'serveReport' ) );
+
+		$this->profiles->boot();
 	}
 
 	/**
@@ -113,9 +123,7 @@ final class Screen {
 		check_admin_referer( self::ACTION );
 
 		$entitlement = $this->pro->entitlement()->entitlement();
-		$notice      = 'saved';
-
-		$frequency = isset( $_POST['schedule'] ) ? sanitize_key( wp_unslash( $_POST['schedule'] ) ) : '';
+		$frequency   = isset( $_POST['schedule'] ) ? sanitize_key( wp_unslash( $_POST['schedule'] ) ) : '';
 
 		if ( $entitlement->allows( ScheduledScans::FEATURE ) ) {
 			$this->pro->scans()->setFrequency( $frequency );
@@ -127,19 +135,11 @@ final class Screen {
 			$this->pro->report()->setBranding( $branding );
 		}
 
-		if ( $entitlement->allows( BulkApply::FEATURE ) ) {
-			$profile = isset( $_POST['profile'] ) ? sanitize_key( wp_unslash( $_POST['profile'] ) ) : '';
-
-			if ( ! $this->pro->bulk()->save( $profile ) ) {
-				$notice = 'unknown-profile';
-			}
-		}
-
 		wp_safe_redirect(
 			add_query_arg(
 				array(
 					'page'   => self::SLUG,
-					'notice' => $notice,
+					'notice' => 'saved',
 				),
 				admin_url( 'admin.php' )
 			)
@@ -227,7 +227,6 @@ final class Screen {
 		echo '<table class="form-table" role="presentation"><tbody>';
 
 		$this->renderSchedule( $entitlement );
-		$this->renderProfile( $entitlement );
 		$this->renderBranding( $entitlement );
 
 		echo '</tbody></table>';
@@ -235,6 +234,13 @@ final class Screen {
 		submit_button( __( 'Save', 'debloater-pro' ) );
 
 		echo '</form>';
+
+		// After the form, and not inside it. Each row of the panel is a form of
+		// its own — a rename posts a name, a delete posts nothing else — and a
+		// form nested in a form is markup no browser agrees about.
+		if ( $entitlement->allows( BulkApply::FEATURE ) ) {
+			$this->profiles->render();
+		}
 
 		$this->renderDrift( $entitlement );
 		$this->renderLicence();
@@ -413,49 +419,6 @@ final class Screen {
 	}
 
 	/**
-	 * The saved profile for bulk apply.
-	 *
-	 * @param \Debloater\Pro\Entitlement\Entitlement $entitlement What is unlocked.
-	 * @return void
-	 */
-	private function renderProfile( $entitlement ): void {
-		if ( ! $entitlement->allows( BulkApply::FEATURE ) ) {
-			return;
-		}
-
-		$saved = $this->pro->bulk()->saved();
-
-		echo '<tr><th scope="row"><label for="debloater-pro-profile">';
-		esc_html_e( 'Saved profile', 'debloater-pro' );
-		echo '</label></th><td>';
-
-		echo '<select name="profile" id="debloater-pro-profile">';
-
-		printf( '<option value="">%s</option>', esc_html__( 'None', 'debloater-pro' ) );
-
-		foreach ( array_keys( $this->pro->profiles() ) as $profile ) {
-			printf(
-				'<option value="%s"%s>%s</option>',
-				esc_attr( (string) $profile ),
-				selected( $saved, $profile, false ),
-				esc_html( ucfirst( (string) $profile ) )
-			);
-		}
-
-		echo '</select>';
-
-		printf(
-			'<p class="description">%s</p>',
-			esc_html__(
-				'Applying it still goes through the preview and the confirmation on the Debloater screen. This only remembers which one you meant.',
-				'debloater-pro'
-			)
-		);
-
-		echo '</td></tr>';
-	}
-
-	/**
 	 * The name on the report.
 	 *
 	 * @param \Debloater\Pro\Entitlement\Entitlement $entitlement What is unlocked.
@@ -607,11 +570,17 @@ final class Screen {
 		}
 
 		$messages = array(
-			'saved'           => array( 'success', __( 'Saved.', 'debloater-pro' ) ),
-			'unknown-profile' => array(
-				'error',
-				__( 'That profile is not one this site knows about, so it was not saved.', 'debloater-pro' ),
-			),
+			'saved'                  => array( 'success', __( 'Saved.', 'debloater-pro' ) ),
+
+			// The profiles panel's, which posts to its own handler and comes
+			// back here to be told how it went.
+			'profile-renamed'        => array( 'success', __( 'Renamed.', 'debloater-pro' ) ),
+			'profile-duplicated'     => array( 'success', __( 'Copied. The copy is yours to rename and edit; the original is untouched.', 'debloater-pro' ) ),
+			'profile-deleted'        => array( 'success', __( 'Deleted. Nothing about this site changed — a profile is a list of changes, not the changes themselves.', 'debloater-pro' ) ),
+			'profile-missing'        => array( 'error', __( 'That profile is not one this site has, so nothing was done.', 'debloater-pro' ) ),
+			'profile-unnamed'        => array( 'error', __( 'A profile needs a name. Nothing was changed.', 'debloater-pro' ) ),
+			'profile-refused'        => array( 'error', __( 'Debloater would not save that: either this site is already holding as many profiles as it keeps, or the profile is one that ships with the plugin and cannot be edited.', 'debloater-pro' ) ),
+			'profile-unknown-action' => array( 'error', __( 'That is not something this screen does.', 'debloater-pro' ) ),
 		);
 
 		if ( ! isset( $messages[ $notice ] ) ) {

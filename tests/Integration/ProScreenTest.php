@@ -119,9 +119,19 @@ final class ProScreenTest extends IntegrationTestCase {
 
 		$markup = $this->render();
 
-		foreach ( array( 'Scan on a schedule', 'Saved profile', 'Name on reports' ) as $control ) {
+		foreach ( array( 'Scan on a schedule', 'Name on reports', 'Profiles' ) as $control ) {
 			$this->assertStringContainsString( $control, $markup );
 		}
+
+		// The dropdown this screen used to carry, and what replaced it. It
+		// listed the three registry profiles and stored which one you meant;
+		// the panel lists every profile the site has and can copy, rename,
+		// delete and export them (§17 Phase 19c). Named here so that removing
+		// the panel would have to remove this line too, rather than quietly
+		// leaving the screen without either.
+		$this->assertStringNotContainsString( 'Saved profile', $markup );
+		$this->assertStringNotContainsString( 'debloater-pro-profile"', $markup );
+		$this->assertStringContainsString( 'debloater-pro-profiles', $markup );
 
 		// §13 rule 2: the form that changes settings carries a nonce.
 		$this->assertStringContainsString( '_wpnonce', $markup );
@@ -175,6 +185,11 @@ final class ProScreenTest extends IntegrationTestCase {
 
 	/**
 	 * A profile that does not exist is refused rather than stored.
+	 *
+	 * `BulkApply` keeps the option and the check; what changed in Phase 19c is
+	 * who writes it. The dropdown wrote it on Save, and the profiles panel
+	 * writes it when somebody presses Apply, which is a plainer statement of
+	 * which profile they meant.
 	 *
 	 * @return void
 	 */

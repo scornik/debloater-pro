@@ -61,9 +61,33 @@ does not run.
 | `tests/Pro/` | nothing but PHP | Pro's own units, and the architecture invariants |
 | `tests/Integration/` | WordPress, and the free plugin active | Pro against a real site |
 
-The integration tests run from the free plugin's wp-env, which maps this
-directory as a second plugin. They are not run by this repository's CI, which
-has no WordPress: see `.github/workflows/ci.yml`.
+The integration tests run from the free plugin's wp-env, with this directory
+mapped in as a second plugin:
+
+```
+wp-env run tests-cli --env-cwd=wp-content/plugins/debloater \
+    php tools/phpunit-9.phar -c ../debloater-pro/phpunit-wp.xml.dist
+```
+
+The mapping goes in the free plugin's `.wp-env.override.json`, which is
+untracked there:
+
+```json
+{
+  "mappings": { "wp-content/plugins/debloater-pro": "../debloater-pro" },
+  "env": {
+    "tests": {
+      "mappings": { "wp-content/plugins/debloater-pro": "../debloater-pro" }
+    }
+  }
+}
+```
+
+Not in its `.wp-env.json`, because that repository is public and its environment
+has to start on a machine with no Pro checkout beside it.
+
+They are not run by this repository's CI, which has no WordPress: see
+`.github/workflows/ci.yml` and docs/DECISIONS.md D-0065.
 
 ## Developing against a real licence
 

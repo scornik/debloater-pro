@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	Pro's integration suite.
+
+	PHPUnit 9.6's schema, not 10.5 like phpunit.xml.dist, because the WordPress
+	core test suite is not compatible with PHPUnit 10: WP_UnitTestCase calls a
+	PHPUnit\Util\Test method that 10 dropped. The free plugin's
+	docs/DECISIONS.md D-0008 records that decision; this file inherits it.
+
+	It runs from the free plugin's wp-env, which is where the WordPress and the
+	PHPUnit 9 phar live, with this repository mapped in as a second plugin.
+	README.md has the command; it is not written out here, because an XML
+	comment may not contain a double hyphen and every option in it has one.
+
+	Paths below are relative to this file, so `tests/Integration` is Pro's.
+-->
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/9.6/phpunit.xsd"
+         bootstrap="tests/bootstrap-integration.php"
+         colors="true"
+         cacheResult="false"
+         beStrictAboutOutputDuringTests="true"
+         beStrictAboutTestsThatDoNotTestAnything="true"
+         convertDeprecationsToExceptions="true"
+         convertErrorsToExceptions="true"
+         convertNoticesToExceptions="true"
+         convertWarningsToExceptions="true"
+         failOnRisky="true"
+         failOnWarning="true">
+    <testsuites>
+        <testsuite name="pro-integration">
+            <directory suffix="Test.php">tests/Integration</directory>
+        </testsuite>
+    </testsuites>
+</phpunit>

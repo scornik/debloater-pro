@@ -3252,3 +3252,126 @@ Checkout, licence, activation and the update channel therefore work as a chain
 rather than as four things believed to work separately. This is worth recording
 with a date because it is a claim about somebody else's live service, and the
 next person to read it should know how old the evidence is.
+
+---
+
+## D-0064 – Pro chooses a profile; Debloater applies it
+
+- **Phase:** 19c
+- **Date:** 2026-09-06
+- **Status:** accepted
+- **Spec:** §13 rules 8 and 15, §17 Phase 19c
+- **See also:** D-0063 (in `scornik/debloater`), which is the free half.
+
+### What replaced what
+
+Pro's screen carried a "Saved profile" dropdown. It listed the three profiles
+the registry defines, stored which one you had picked, and said so in its own
+description: *"This only remembers which one you meant."* The phase that
+introduced profiles named it as the placeholder it was.
+
+`Admin\ProfilesPanel` replaces it. It lists every profile the site has, built-in
+and saved, and offers Apply, Export, Duplicate, Rename and Delete.
+
+### Apply does not apply
+
+This is the decision, and everything else here follows from it.
+
+Apply builds a URL — `?page=debloater&debloater_profile=<id>` — and redirects to
+it. Debloater's screen looks the id up in its own store and opens its ordinary
+preview with those changes ticked. The plan, the confirmation token issued for
+that exact plan, the recovery point, the verification and the automatic rollback
+are all the free plugin's, unchanged, and Pro is not involved in any of them.
+
+The alternative was to plan and apply in Pro, reusing `BulkApply`, and it was
+rejected on the grounds that make it tempting. It would have been convenient,
+one click shorter, and entirely within Pro's reach. It would also have meant a
+paid extension holding a second route into applying — and a second route is a
+route that can be got at without the first one's checks, whatever the intention
+of whoever adds to it next year. §13 rule 15 says safety is never paywalled;
+the sharper form of it is that the paid half must not be able to *route around*
+the free half's safety either.
+
+So `ProfilesPanel` contains no plan, no token and no call into the engine, and a
+test asks it to apply and requires it to answer that it does not know how.
+
+### The URL is an id, never a selection
+
+`debloater_profile` carries a profile id. The free screen resolves it against
+its own store, so a link somebody edited by hand can name a profile that does
+not exist — and gets nothing — but cannot name a set of changes of its own
+choosing. The worst a crafted link achieves is showing somebody a preview of
+changes the site was already offering them, behind the same confirmation as
+always.
+
+It is documented in the free plugin's `docs/HOOKS.md` as a URL contract, and
+pinned on both sides by tests that assert the literal string rather than each
+side's own constant.
+
+### Built-ins can be copied but not edited
+
+Rename and Delete are rendered only for a site's own profiles. That is a
+courtesy; the enforcement is `ProfileStore`, which refuses either for a
+registry profile no matter what is posted, and the test posts them anyway.
+
+Duplicate *is* offered for a built-in, because copying `Safe` and adjusting the
+copy is how somebody starts. The copy is an ordinary saved profile from the
+moment it exists.
+
+### `BulkApply` keeps its option, and Apply writes it
+
+`Features\BulkApply` is unchanged: same option, same registry check, same
+`apply()` that takes a confirmation token for the exact plan. What changed is
+who writes the option. The dropdown wrote it when you pressed Save; the panel
+writes it when you press Apply, which is a plainer statement of which profile
+you meant than picking one from a list and saving a form.
+
+Saved profiles are not storable there, because `BulkApply` plans by profile id
+and a site's own profile is a selection rather than a name the planner knows.
+`save()` says so by returning false, and the panel does not need to care.
+
+---
+
+## D-0065 – Pro's integration suite runs again, from the free plugin's wp-env
+
+- **Phase:** 19c
+- **Date:** 2026-09-06
+- **Status:** accepted
+- **Spec:** §21.2
+
+### What was wrong
+
+The split removed the wp-env mapping and the PHPUnit suite that ran Pro's
+integration tests, and the commit said so plainly: "the build no longer knows
+Pro exists." What it did not say, because nobody noticed, is that
+`tests/Integration/` came with Pro and there was then nothing anywhere that
+could run it. `ProScreenTest` and `ProIntegrationTest` were present, correct,
+and unreachable for four commits.
+
+They did not fail and they did not skip. They simply were not collected, which
+is the failure mode this project treats as worse than a red build: a suite that
+is not run reports nothing at all, and nothing at all reads as fine.
+
+### Where the pieces live now
+
+Three things are needed and they are in three repositories' worth of places:
+
+| Piece | Where | Why there |
+|---|---|---|
+| `phpunit-wp.xml.dist` | here | It configures Pro's tests. PHPUnit resolves paths from the config file, so `tests/Integration` means Pro's. |
+| `tests/bootstrap-integration.php` | here | Loads Pro's autoloader, then requires the free plugin's bootstrap verbatim rather than reimplementing it. |
+| the wp-env mapping | the free plugin's **untracked** `.wp-env.override.json` | wp-env runs there. |
+
+The mapping is deliberately not in the free plugin's `.wp-env.json`. That
+repository is public and its environment must start on a machine that has no
+private sibling checkout; a tracked mapping to `../debloater-pro` would make
+`wp-env start` fail for everyone else. `.wp-env.override.json` is gitignored
+there and `.distignore` already excludes it from the package.
+
+### It is still not in CI
+
+Pro's CI has no WordPress, so this suite runs locally and before a release, not
+on every push — the same arrangement as before the split. That is a known gap
+rather than a hidden one, and the architecture invariants in `tests/Pro`, which
+*do* run on every push, are the ones that guard the properties worth guarding
+automatically.

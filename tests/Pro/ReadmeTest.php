@@ -77,12 +77,28 @@ final class ReadmeTest extends TestCase {
 
 		$this->assertMatchesRegularExpression( '/^\d+\.\d+$/', $tested );
 
-		$free = dirname( __DIR__, 3 ) . '/debloater/readme.txt';
+		// The same two places ProArchitectureTest looks, and in the same order.
+		// This test looked only at the sibling, so it skipped on every machine
+		// and every CI job where the free plugin is somewhere else and named by
+		// DEBLOATER_FREE_PATH -- which is the arrangement README.md documents.
+		// A skip is a legitimate outcome when the plugin is genuinely absent
+		// and a lie when it is present under another name.
+		$named = getenv( 'DEBLOATER_FREE_PATH' );
+		$free  = '';
 
-		if ( ! is_file( $free ) ) {
+		foreach ( array( is_string( $named ) ? $named : '', dirname( __DIR__, 3 ) . '/debloater' ) as $candidate ) {
+			if ( '' !== $candidate && is_file( $candidate . '/readme.txt' ) ) {
+				$free = $candidate . '/readme.txt';
+
+				break;
+			}
+		}
+
+		if ( '' === $free ) {
 			$this->markTestSkipped(
 				'The free plugin is not checked out beside this one, so the two "Tested up to" '
-					. 'values could not be compared. Clone scornik/debloater as a sibling.'
+					. 'values could not be compared. Clone scornik/debloater as a sibling, or '
+					. 'set DEBLOATER_FREE_PATH.'
 			);
 		}
 
