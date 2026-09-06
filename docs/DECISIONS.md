@@ -3138,10 +3138,12 @@ walked directories and never opened `debloater-pro.php`.
 
 ### White-label
 
-On a licence with white-label enabled the SDK hides its Account menu. A Pro
-screen whose only route to licence status or deactivation was a link to that
-menu would leave exactly the customers on the two most expensive rows unable to
-see what they hold or to release a site. Both are rendered on Pro's own screen,
+**Corrected by D-0061, which was written after testing this against the live
+product.** What follows was wrong when it was written: the SDK does *not* hide
+its Account menu on a white-labelled licence.
+
+The conclusion it reached happens to be right, and for a better reason. Both
+licence status and a way to release the site are rendered on Pro's own screen,
 and a test asserts the screen names no Account URL at all.
 
 ### Wording
@@ -3156,3 +3158,97 @@ The opt-in screen and every word of its data-collection copy are left exactly as
 the SDK wrote them. That text is a disclosure of what gets sent to a third
 party, and rewording somebody else's privacy disclosure to suit your own tone is
 not a thing to do.
+
+---
+
+## D-0061 – what white-label actually does, and what we may promise
+
+- **Phase:** 19b, part 2, after launch testing
+- **Date:** 2026-09-06
+- **Status:** accepted
+- **Corrects:** D-0060
+
+### What was believed
+
+That enabling white-label on a licence removes the Freemius Account submenu, so
+an agency's client would see no licensing UI at all. Three files said so: the
+adapter, the Pro screen, and the test named for it.
+
+### What is true
+
+White-label is a flag **on a licence**, not on the product – the Licenses table
+in the Freemius dashboard, column "Is White-labeled". It can be set on licences
+sold through a pricing row that has White Labeled enabled, which for this
+product is the 5-site, 20-site and Unlimited rows.
+
+**It does not remove the Account submenu.** The SDK forces that submenu on,
+because licence activation and deactivation happen there and a plugin whose
+licence cannot be deactivated is a plugin that cannot be moved between sites.
+
+What it hides is the sensitive content of that page:
+
+| Hidden on a white-labelled licence | Still visible |
+|---|---|
+| The licence owner's email address | The Account menu item itself |
+| The licence key | Activation and deactivation |
+| Prices | The plugin's own version and update state |
+| Billing address | |
+| Invoices | |
+
+### What this changes
+
+**The requirement on our own screen is unchanged, and its reason is stronger.**
+It was "the Account page may be absent". It is now "the client-facing Account
+page is uninformative" – deliberately emptied of exactly what somebody looking
+at it wants to know. So plan, licence status and a deactivate path are rendered
+on Pro's own screen, and the test asserting that keeps its assertion and gets a
+new name and message.
+
+**What we may say to an agency is narrower than what was implied.** We may say a
+client does not see the licence key, the prices or the invoices. We may not say
+the client sees no Freemius UI: they see an Account item, and it works. Saying
+otherwise would be a promise the SDK contradicts on the first screenshot
+somebody sends back.
+
+---
+
+## D-0062 – the commerce path is verified end to end
+
+- **Phase:** 19b, part 2
+- **Date:** 2026-09-06
+- **Status:** accepted
+- **Product:** Freemius `38409`, `debloater-pro`
+
+### The plan and its rows
+
+One plan, `pro`. Annual only, auto-renew.
+
+| Row | Price | Pricing ID | White-label available |
+|---|---|---|---|
+| Single site | $29 | 85724 | no |
+| 5 sites | $49 | 85727 | yes |
+| 20 sites | $79 | 85726 | yes |
+| Unlimited | $149 | 85725 | yes |
+
+**Expiry blocks features** (Is Blocking on). When a licence expires Pro's
+features stop.
+
+**The free plugin is unaffected by Pro expiry.** Debloater keeps scanning,
+applying, verifying and rolling back, and every change already applied stays
+applied. That is not a courtesy: BUILD-SPEC §13 rule 15 says safety is never
+paywalled, and an expiry that took recovery or rollback with it would break that
+rule rather than bend it.
+
+### Verified, not assumed
+
+A sandbox purchase of the 20-site row, on 2026-09-06:
+
+1. Checkout completed.
+2. A licence was issued.
+3. The licence activated on a second site.
+4. Freemius deployment served version 0.1.1 to it.
+
+Checkout, licence, activation and the update channel therefore work as a chain
+rather than as four things believed to work separately. This is worth recording
+with a date because it is a claim about somebody else's live service, and the
+next person to read it should know how old the evidence is.

@@ -100,3 +100,35 @@ so that the platform is replaceable and the plugin is not built around one.
 Nothing secret is in this repository. Store identifiers that must not be
 published belong in `wp-config.php` constants, and `.distignore` excludes
 `config/freemius.php` before it exists.
+
+### Plans
+
+One plan, annual, auto-renewing. Features stop when a licence expires; the free
+plugin does not – Debloater keeps scanning, applying, verifying and rolling
+back, and everything already applied stays applied.
+
+| Row | Price | White-label available |
+|---|---|---|
+| Single site | $29 | no |
+| 5 sites | $49 | yes |
+| 20 sites | $79 | yes |
+| Unlimited | $149 | yes |
+
+### What white-label does, exactly
+
+It is a flag on an individual licence, set from the Freemius dashboard, on
+licences bought through a row that offers it.
+
+On a site with a white-labelled licence, the agency's client **does not see**
+the licence owner's email, the licence key, prices, the billing address or
+invoices.
+
+They **do still see** an Account item in the menu, and it works – the SDK keeps
+it because licence activation and deactivation happen there. Anyone telling a
+client "you will see no licensing screens" is promising something this does not
+do.
+
+Because that page is stripped of the useful parts, Pro's own screen carries the
+plan, the licence state and a way to release the site. That is where to look,
+and it is the same on every licence.
+

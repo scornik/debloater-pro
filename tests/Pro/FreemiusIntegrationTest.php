@@ -248,21 +248,28 @@ final class FreemiusIntegrationTest extends TestCase {
 	}
 
 	/**
-	 * The Pro screen shows licence state without sending anybody to Account.
+	 * The Pro screen carries licence state itself, not a link to Account.
 	 *
-	 * White-label licences make the SDK hide its Account menu entirely. A Pro
-	 * screen whose only route to licence status or deactivation was a link to
-	 * that menu would leave exactly the customers who paid most with no way to
-	 * see what they hold or to release a site.
+	 * The assertion is unchanged from when this was written; the reason for it
+	 * was wrong. It said white-label removes the SDK's Account submenu. It does
+	 * not — the SDK forces that submenu on, because licence activation and
+	 * deactivation live there.
 	 *
-	 * So both are rendered on our own screen. Asserted against the source
-	 * rather than by rendering, because rendering needs WordPress and this
-	 * suite deliberately runs without it — and because what is being defended
-	 * is *where* the information lives, which is a property of the file.
+	 * What white-label removes is the content: the owner's email, the licence
+	 * key, prices, the billing address, invoices. An agency's client therefore
+	 * sees an Account item that answers almost nothing, which is a better
+	 * argument for this test rather than a weaker one. A Pro screen whose only
+	 * answer to "what does this site have" was "open Account" would be pointing
+	 * at the page most deliberately emptied of it.
+	 *
+	 * Asserted against the source rather than by rendering, because rendering
+	 * needs WordPress and this suite deliberately runs without it — and because
+	 * what is being defended is *where* the information lives, which is a
+	 * property of the file.
 	 *
 	 * @return void
 	 */
-	public function test_the_pro_screen_shows_licence_state_without_the_account_page(): void {
+	public function test_the_pro_screen_carries_licence_state_itself(): void {
 		$screen = (string) file_get_contents( dirname( __DIR__, 2 ) . '/src/Admin/Screen.php' );
 
 		// It exists, and the main screen actually calls it.
@@ -273,13 +280,14 @@ final class FreemiusIntegrationTest extends TestCase {
 		$this->assertStringContainsString( 'siteQuota', $screen );
 		$this->assertStringContainsString( 'Release this site from the licence', $screen );
 
-		// And it never tells somebody to go and look at the Account page,
-		// which is the page white-label removes.
+		// And it never answers by sending somebody to the Account page, which
+		// on a white-labelled licence is present and stripped of the answer.
 		foreach ( array( 'get_account_url', 'fs_account', 'account.php?page=debloater-pro-account' ) as $forbidden ) {
 			$this->assertStringNotContainsString(
 				$forbidden,
 				$screen,
-				'The Pro screen must not depend on the SDK Account page, which white-label hides.'
+				'The Pro screen must answer for itself: on a white-labelled licence the Account '
+					. 'page still exists but shows no key, no prices and no invoices.'
 			);
 		}
 

@@ -246,12 +246,17 @@ final class Screen {
 	/**
 	 * What this site's licence covers, on our own screen.
 	 *
-	 * Not a link to somewhere else. On a licence with white-label enabled the
-	 * SDK hides its Account menu, and a Pro screen whose only route to licence
-	 * status was that menu would leave those customers unable to see what they
-	 * hold or to release a site they no longer use. So it is rendered here, and
-	 * a test asserts this method never sends anybody to the Account page to
-	 * find out.
+	 * Not a link to somewhere else. The SDK's Account submenu is always there —
+	 * it is forced on, because licence activation and deactivation live on it —
+	 * but on a white-labelled licence its contents are stripped: no owner
+	 * email, no licence key, no prices, no billing address, no invoices.
+	 *
+	 * So an agency's client sees an Account item that tells them almost
+	 * nothing. A Pro screen whose only answer to "what does this site have" was
+	 * a link to that page would be pointing at the one page deliberately
+	 * emptied of the answer. Plan, licence state and a way to release the site
+	 * are therefore rendered here, and a test asserts this screen carries them
+	 * itself rather than delegating.
 	 *
 	 * Display only. The quota shown is the platform's own count and nothing
 	 * here decides anything on it: enforcing a site limit from inside the

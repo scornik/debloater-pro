@@ -219,14 +219,20 @@ final class FreemiusEntitlementProvider implements EntitlementProvider {
 	/**
 	 * Where a customer manages this licence, as plain URLs.
 	 *
-	 * The reason this exists is white-label. On a licence with white-label
-	 * enabled the SDK hides its Account menu entirely, so a Pro screen that
-	 * linked to that menu for licence status or deactivation would be linking
-	 * to a page the customer cannot reach — and the customer would have no way
-	 * to see what they hold or to release a site.
+	 * The reason this exists is white-label, and not the reason first written
+	 * here. That said the SDK hid its Account menu on a white-labelled licence.
+	 * It does not: the SDK forces that submenu on, because activating and
+	 * deactivating a licence happen there. What white-label hides is the
+	 * *content* — the owner's email, the licence key, prices, the billing
+	 * address and invoices.
 	 *
-	 * So the URLs are asked for here and rendered on our own screen. Strings
-	 * out, no Freemius object, and null for anything the SDK will not give.
+	 * So the page is present and, for the agency's client, close to empty. That
+	 * is the actual problem: a Pro screen whose only answer to "what does this
+	 * site have" was "go and look at Account" would be sending somebody to a
+	 * page deliberately stripped of exactly that.
+	 *
+	 * The URLs are asked for here and rendered on our own screen. Strings out,
+	 * no Freemius object, and null for anything the SDK will not give.
 	 *
 	 * @return array{account: string|null, deactivate: string|null}
 	 */
