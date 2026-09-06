@@ -168,6 +168,12 @@ jobs:
             '(sk_live|sk_test|pk_live|rk_live|ghp_|gho_|github_pat_)[A-Za-z0-9_]{16}'
             '-----BEGIN [A-Z ]*PRIVATE KEY-----'
             "(SECRET_KEY|secret_key)['\"]?[[:space:]]*[=:>][[:space:]]*['\"][A-Za-z0-9_/+-]{12}"
+            # The licensing platform's own secret, which is what a developer
+            # pastes into wp-config.php while integrating and is the single
+            # most likely thing to end up committed by accident. It is a
+            # different value from the public key in config/freemius.php.dist,
+            # which is not secret and ships.
+            "WP_FS__[A-Za-z0-9_-]+_SECRET_KEY['\"]?[[:space:]]*[,=:)>][[:space:]]*['\"][A-Za-z0-9_/+-]{8}"
           )
 
           # Exactly two files are exempt, by full path, because they are where

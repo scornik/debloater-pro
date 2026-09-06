@@ -38,11 +38,29 @@ final class ProArchitectureTest extends TestCase {
 	 * @return void
 	 */
 	public function test_no_freemius_symbol_outside_the_adapter(): void {
-		$adapter   = 'pro/src/Entitlement/FreemiusEntitlementProvider.php';
+		$adapter = 'pro/src/Entitlement/FreemiusEntitlementProvider.php';
+
+		// Two files, and the second one is new.
+		//
+		// The SDK has to be initialised before `plugins_loaded`: it hooks
+		// activation, deactivation and the admin menu, and a licence check that
+		// starts later has already missed them. WordPress offers exactly one
+		// place that early, the plugin's entry point, so `fs_dynamic_init()`
+		// lives there and cannot live in the adapter.
+		//
+		// What the rule protects is unchanged: everything Freemius *knows* —
+		// plans, licences, trials, quotas — is read in the adapter and leaves
+		// as an `Entitlement`. The entry point only starts the SDK; it asks it
+		// nothing. Any third file naming Freemius is still a failure.
+		$allowed = array(
+			$adapter,
+			'pro/debloater-pro.php',
+		);
+
 		$offenders = array();
 
 		foreach ( $this->sources() as $path => $source ) {
-			if ( $adapter === $path ) {
+			if ( in_array( $path, $allowed, true ) ) {
 				continue;
 			}
 
@@ -71,6 +89,13 @@ final class ProArchitectureTest extends TestCase {
 			"§13 rule 13: the licensing platform must not be named outside its adapter.\n"
 				. implode( "\n", $offenders )
 		);
+
+		// The entry point really does start the SDK, so this cannot pass by the
+		// bootstrap having been dropped.
+		$entry = $this->sources()['pro/debloater-pro.php'] ?? '';
+
+		$this->assertStringContainsString( 'fs_dynamic_init', $entry );
+		$this->assertStringContainsString( 'dp_fs_loaded', $entry );
 
 		// And the adapter really is where it lives, so this test cannot pass by
 		// the adapter having been deleted.
@@ -327,6 +352,18 @@ final class ProArchitectureTest extends TestCase {
 			$free => array( 'src', 'runtime-handlers', 'mu-loader' ),
 		);
 
+		// The entry points, which are not in any of those directories and are
+		// exactly where a plugin's bootstrap lives.
+		//
+		// They were not read at all until the Freemius bootstrap was added to
+		// `debloater-pro.php` and this suite stayed green. A test named "no
+		// Freemius symbol outside the adapter" that never opens the file the
+		// SDK is initialised in is not checking what it says it checks.
+		$entries = array(
+			'pro/debloater-pro.php' => $root . '/debloater-pro.php',
+			'free/debloater.php'    => $free . '/debloater.php',
+		);
+
 		foreach ( $trees as $base => $directories ) {
 			foreach ( $directories as $directory ) {
 				$where = $base . '/' . $directory;
@@ -349,6 +386,12 @@ final class ProArchitectureTest extends TestCase {
 
 					$files[ $key ] = (string) file_get_contents( $file->getPathname() );
 				}
+			}
+		}
+
+		foreach ( $entries as $key => $path ) {
+			if ( is_file( $path ) ) {
+				$files[ $key ] = (string) file_get_contents( $path );
 			}
 		}
 

@@ -16,7 +16,14 @@
 	<file>tests</file>
 	<file>debloater-pro.php</file>
 
+	<!--
+		The Freemius SDK is third-party code that ships inside this plugin. It
+		is held to its own standards by the people who wrote it, and reporting
+		on it here would bury Pro's own results under several thousand lines
+		about somebody else's formatting.
+	-->
 	<exclude-pattern>*/vendor/*</exclude-pattern>
+	<exclude-pattern>*/vendor/freemius/*</exclude-pattern>
 	<exclude-pattern>*/node_modules/*</exclude-pattern>
 
 	<arg name="basepath" value="."/>

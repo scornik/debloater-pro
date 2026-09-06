@@ -1,0 +1,32 @@
+<?php
+/**
+ * The Freemius product this plugin belongs to.
+ *
+ * Copy to `config/freemius.php` to override any of it locally. That file is
+ * gitignored and excluded from packages; this one is committed and ships, so a
+ * distributed build works with no copying at all.
+ *
+ * **Nothing here is secret.** A Freemius product id and public key are handed
+ * to every browser that loads the licensing UI, and they are what identifies
+ * the product rather than what authorises anything. The secret key is a
+ * different value entirely, belongs in the test site's `wp-config.php`, and is
+ * never in this repository — see README.md, and the CI job that fails if one
+ * appears.
+ *
+ * @package DebloaterPro
+ */
+
+declare( strict_types = 1 );
+
+return array(
+	/*
+	 * The product id from the Freemius dashboard's Init SDK snippet.
+	 */
+	'id'         => '38409',
+
+	/*
+	 * The product's public key. Public in the ordinary sense: it is embedded in
+	 * every page the SDK renders.
+	 */
+	'public_key' => 'pk_9255b5bdb75deb17f57a40707ed87',
+);

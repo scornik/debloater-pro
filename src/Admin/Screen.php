@@ -237,9 +237,87 @@ final class Screen {
 		echo '</form>';
 
 		$this->renderDrift( $entitlement );
+		$this->renderLicence();
 		$this->renderReports( $entitlement );
 
 		echo '</div>';
+	}
+
+	/**
+	 * What this site's licence covers, on our own screen.
+	 *
+	 * Not a link to somewhere else. On a licence with white-label enabled the
+	 * SDK hides its Account menu, and a Pro screen whose only route to licence
+	 * status was that menu would leave those customers unable to see what they
+	 * hold or to release a site they no longer use. So it is rendered here, and
+	 * a test asserts this method never sends anybody to the Account page to
+	 * find out.
+	 *
+	 * Display only. The quota shown is the platform's own count and nothing
+	 * here decides anything on it: enforcing a site limit from inside the
+	 * plugin would mean enforcing a rule it cannot see the whole of.
+	 *
+	 * @return void
+	 */
+	private function renderLicence(): void {
+		$provider = $this->pro->entitlement();
+
+		if ( ! $provider instanceof \Debloater\Pro\Entitlement\FreemiusEntitlementProvider
+			&& ! method_exists( $provider, 'siteQuota' ) ) {
+			return;
+		}
+
+		// Asked by name rather than by type. The provider is whatever the
+		// installation wired up — the Freemius adapter on a real site, a
+		// fixture in development — and only some of them can answer this.
+		$quota = method_exists( $provider, 'siteQuota' ) ? $provider->siteQuota() : null;
+		$urls  = method_exists( $provider, 'licenceUrls' ) ? $provider->licenceUrls() : array();
+
+		echo '<h2>' . esc_html__( 'Licence', 'debloater-pro' ) . '</h2>';
+
+		if ( ! is_array( $quota ) ) {
+			printf(
+				'<p class="description">%s</p>',
+				esc_html__(
+					'This site could not read its licence just now. Pro keeps working on what it last knew, and nothing about your site changes while that is true.',
+					'debloater-pro'
+				)
+			);
+
+			return;
+		}
+
+		$limit = $quota['limit'] ?? null;
+		$used  = $quota['used'] ?? null;
+
+		printf(
+			'<p>%s</p>',
+			esc_html(
+				null === $limit
+					? sprintf(
+						/* translators: %s: number of sites, or "not known". */
+						__( 'Unlimited sites. In use on %s.', 'debloater-pro' ),
+						null === $used ? __( 'a number this site cannot read', 'debloater-pro' ) : (string) $used
+					)
+					: sprintf(
+						/* translators: 1: sites in use, 2: sites the licence covers. */
+						__( 'In use on %1$s of %2$d sites.', 'debloater-pro' ),
+						null === $used ? '?' : (string) $used,
+						$limit
+					)
+			)
+		);
+
+		$deactivate = $urls['deactivate'] ?? null;
+
+		if ( is_string( $deactivate ) && '' !== $deactivate ) {
+			printf(
+				'<p><a href="%1$s">%2$s</a> %3$s</p>',
+				esc_url( $deactivate ),
+				esc_html__( 'Release this site from the licence', 'debloater-pro' ),
+				esc_html__( 'Pro stops here and frees the slot for another site. Nothing Debloater has applied is undone.', 'debloater-pro' )
+			);
+		}
 	}
 
 	/**

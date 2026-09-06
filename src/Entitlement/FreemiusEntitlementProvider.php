@@ -37,7 +37,7 @@ final class FreemiusEntitlementProvider implements EntitlementProvider {
 	 * Freemius symbol that a static analyser or a grep would have to know
 	 * about — including the invariant test, which greps for exactly this.
 	 */
-	private const SDK_FUNCTION = 'debloater_fs';
+	private const SDK_FUNCTION = 'dp_fs';
 
 	/**
 	 * Plan-to-feature mapping.
@@ -86,14 +86,30 @@ final class FreemiusEntitlementProvider implements EntitlementProvider {
 		}
 
 		try {
-			if ( ! method_exists( $sdk, 'is_paying' ) ) {
+			// `can_use_premium_code__premium_only()` rather than `is_paying()`.
+			//
+			// They answer different questions. `is_paying()` asks whether there
+			// is a live paid subscription; the premium check asks whether this
+			// build is entitled to run premium code, which is also true during
+			// a trial and true for a licence that is paid up but not renewing.
+			// Gating on the first would switch features off for somebody who
+			// had cancelled a renewal and still had three months left.
+			//
+			// The method carries the `__premium_only` suffix because the SDK
+			// strips such methods out of a free build. This is a premium-only
+			// product, so it is always present — but it is checked for anyway,
+			// because a missing method must read as "nothing unlocked" and not
+			// as a fatal.
+			$gate = 'can_use_premium_code__premium_only';
+
+			if ( ! method_exists( $sdk, $gate ) ) {
 				// An SDK that is present but does not answer the one question
 				// asked of it. A version bump that renamed the method lands
 				// here, and lands as "nothing unlocked" rather than as a fatal.
 				return Entitlement::none( 'freemius-unrecognised' );
 			}
 
-			if ( true !== $sdk->is_paying() ) {
+			if ( true !== $sdk->$gate() ) {
 				return Entitlement::none( 'freemius-unpaid' );
 			}
 
@@ -143,7 +159,6 @@ final class FreemiusEntitlementProvider implements EntitlementProvider {
 		$entry = self::SDK_FUNCTION;
 
 		try {
-			// @phpstan-ignore callable.nonCallable (The entry function is defined by the licensing SDK, which is a separate plugin and deliberately not a dependency of this one — so it is not in the analysed set and never will be. The function_exists() check above is the one that applies at runtime.)
 			$instance = $entry();
 		} catch ( \Throwable $error ) {
 			unset( $error );
@@ -152,6 +167,91 @@ final class FreemiusEntitlementProvider implements EntitlementProvider {
 		}
 
 		return is_object( $instance ) ? $instance : null;
+	}
+
+	/**
+	 * How many sites this licence covers, and how many are used.
+	 *
+	 * **For display only.** Nothing decides anything on this: the licensing
+	 * platform enforces its own quota, and a plugin that switched features off
+	 * because it had counted the sites itself would be enforcing a rule it
+	 * cannot see the whole of — other installs, a site removed an hour ago, a
+	 * quota the customer has since raised.
+	 *
+	 * Returned as plain scalars so nothing outside this file holds a Freemius
+	 * object. `null` when there is no licence, when the SDK does not expose one,
+	 * or when reading it throws — all three being "we cannot say", which the
+	 * screen renders as "not known" rather than as a number that might be wrong.
+	 *
+	 * @return array{limit: int|null, used: int|null}|null
+	 */
+	public function siteQuota(): ?array {
+		$sdk = $this->sdk();
+
+		if ( null === $sdk || ! method_exists( $sdk, '_get_license' ) ) {
+			return null;
+		}
+
+		try {
+			$licence = $sdk->_get_license();
+
+			if ( ! is_object( $licence ) ) {
+				return null;
+			}
+
+			// `quota` is null on an unlimited licence, which is a meaningful
+			// answer rather than a missing one, so it is passed through as null
+			// and the screen says "unlimited".
+			$limit = property_exists( $licence, 'quota' ) ? $licence->quota : null;
+			$used  = property_exists( $licence, 'activated' ) ? $licence->activated : null;
+
+			return array(
+				'limit' => is_numeric( $limit ) ? (int) $limit : null,
+				'used'  => is_numeric( $used ) ? (int) $used : null,
+			);
+		} catch ( \Throwable $error ) {
+			unset( $error );
+
+			return null;
+		}
+	}
+
+	/**
+	 * Where a customer manages this licence, as plain URLs.
+	 *
+	 * The reason this exists is white-label. On a licence with white-label
+	 * enabled the SDK hides its Account menu entirely, so a Pro screen that
+	 * linked to that menu for licence status or deactivation would be linking
+	 * to a page the customer cannot reach — and the customer would have no way
+	 * to see what they hold or to release a site.
+	 *
+	 * So the URLs are asked for here and rendered on our own screen. Strings
+	 * out, no Freemius object, and null for anything the SDK will not give.
+	 *
+	 * @return array{account: string|null, deactivate: string|null}
+	 */
+	public function licenceUrls(): array {
+		$sdk  = $this->sdk();
+		$urls = array(
+			'account'    => null,
+			'deactivate' => null,
+		);
+
+		if ( null === $sdk || ! method_exists( $sdk, 'get_account_url' ) ) {
+			return $urls;
+		}
+
+		try {
+			$account = $sdk->get_account_url();
+			$release = $sdk->get_account_url( 'deactivate_license' );
+
+			$urls['account']    = is_string( $account ) ? $account : null;
+			$urls['deactivate'] = is_string( $release ) ? $release : null;
+		} catch ( \Throwable $error ) {
+			unset( $error );
+		}
+
+		return $urls;
 	}
 
 	/**

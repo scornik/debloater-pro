@@ -36,7 +36,11 @@ phpstan.neon
 
 # Licensing configuration is not distributable.
 #
-# `config/freemius.php` holds the store's own identifiers. The secret half of
+# `config/freemius.php
+
+# The SDK itself ships: it is what talks to the licensing platform, and a Pro
+# build without it has no way to know what the customer has paid for. Only the
+# local override above is excluded.` holds the store's own identifiers. The secret half of
 # those must never appear in a package (BUILD-SPEC §13 rule 15), so the file is
 # excluded here before it exists rather than after somebody notices it in a
 # zip. Part 2 adds the file and `vendor/freemius/` — the SDK itself *does*

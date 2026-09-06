@@ -3067,3 +3067,92 @@ arrives as an ordinary 200.
 - The brief asked for this to be recorded against D-0009. D-0009 is about Docker
   DNS on the build machine and has nothing to do with probes; the decisions this
   actually amends are D-0019 and D-0020, and they say so.
+
+---
+
+## D-0060 – the Freemius product, and what it is allowed to decide
+
+- **Phase:** 19b, part 2
+- **Date:** 2026-09-06
+- **Status:** accepted
+- **Spec:** §13 rule 13, §13 rule 15
+- **Implements:** D-0035 (licensing is provider-agnostic)
+
+### The product
+
+| | |
+|---|---|
+| Platform | Freemius |
+| Product id | `38409` |
+| Slug / premium slug | `debloater-pro` |
+| Type | plugin, premium-only (`is_premium_only`) |
+| wordpress.org compliant | **no** – Pro is not distributed there |
+| Add-ons | none |
+| Plan | one, `pro` |
+| Pricing rows | 1 site, 20 sites, unlimited |
+| White-label | on the 20-site and unlimited rows |
+
+The id and public key live in `config/freemius.php.dist`, which is committed and
+ships. Neither is secret: both are handed to every browser that loads the
+licensing UI, and they identify the product rather than authorising anything.
+`config/freemius.php` overrides them locally, is gitignored and is excluded from
+packages, so a local experiment cannot become a release.
+
+The **secret** key is a different value, belongs in the test site's
+`wp-config.php`, and is never in this repository. CI fails on an assigned
+`WP_FS__*_SECRET_KEY` anywhere, and that check is fail-probed.
+
+### What the SDK is allowed to decide
+
+**Whether premium code may run, and nothing else.** The gate is
+`can_use_premium_code__premium_only()` rather than `is_paying()`: they answer
+different questions, and the second would switch features off for somebody who
+had cancelled a renewal with three months still paid for.
+
+**The site quota is read for display only.** It is shown on Pro's own screen and
+decides nothing. A plugin that enforced a site limit itself would be enforcing a
+rule it cannot see the whole of – other installs, a site released an hour ago, a
+quota the customer has since raised – and would get it wrong in the direction
+that costs the customer.
+
+**Nothing it says can block the free plugin.** Entitlement is cached, so a
+platform that is unreachable leaves Pro on its last known answer rather than
+switching features off. `CachedEntitlementProvider` now also catches a provider
+that throws: the interface says implementations must not, and the adapter does
+not, but a guarantee that holds only while everyone keeps their promise is not
+the guarantee it claims to be.
+
+### Two files may name Freemius, not one
+
+`ProArchitectureTest` allowed exactly one – the adapter. The SDK has to be
+initialised before `plugins_loaded`, because it hooks activation, deactivation
+and the admin menu, and WordPress offers one place that early: the plugin's
+entry point. So `debloater-pro.php` joins the adapter on the allowed list.
+
+The rule it protects is unchanged. The entry point *starts* the SDK; it asks it
+nothing. Everything Freemius knows – plans, licences, trials, quotas – is read
+in the adapter and leaves as an `Entitlement`. A third file naming Freemius is
+still a failure, and the test now reads the entry points, which it did not
+before: the bootstrap was added and the suite stayed green, because `sources()`
+walked directories and never opened `debloater-pro.php`.
+
+### White-label
+
+On a licence with white-label enabled the SDK hides its Account menu. A Pro
+screen whose only route to licence status or deactivation was a link to that
+menu would leave exactly the customers on the two most expensive rows unable to
+see what they hold or to release a site. Both are rendered on Pro's own screen,
+and a test asserts the screen names no Account URL at all.
+
+### Wording
+
+Only the licence notices are overridden, through `override_i18n()`, so they
+describe feature updates, drift alerts and priority support rather than the
+SDK's default wording about security updates and support. The placeholders are
+preserved in number and order – these strings reach `sprintf`, so an override
+that drops a `%s` does not read differently, it throws.
+
+The opt-in screen and every word of its data-collection copy are left exactly as
+the SDK wrote them. That text is a disclosure of what gets sent to a third
+party, and rewording somebody else's privacy disclosure to suit your own tone is
+not a thing to do.

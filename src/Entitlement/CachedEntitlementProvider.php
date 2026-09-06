@@ -88,7 +88,21 @@ final class CachedEntitlementProvider implements EntitlementProvider {
 			return $this->resolved;
 		}
 
-		$fresh = $this->inner->entitlement();
+		// The interface says an implementation must never throw, and the
+		// Freemius adapter catches everything. This catches it again anyway.
+		//
+		// Not distrust of the adapter: this class exists so that a licensing
+		// platform having a bad day is not a site having a bad day, and a
+		// guarantee that holds only while every provider keeps its promise is
+		// not the guarantee it claims to be. The cost is four lines; the
+		// failure it prevents is a white admin screen on somebody's site.
+		try {
+			$fresh = $this->inner->entitlement();
+		} catch ( \Throwable $error ) {
+			unset( $error );
+
+			$fresh = Entitlement::none( 'provider-threw' );
+		}
 
 		if ( ! $fresh->isEmpty() ) {
 			$this->store( $fresh );

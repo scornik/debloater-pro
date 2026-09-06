@@ -65,6 +65,31 @@ The integration tests run from the free plugin's wp-env, which maps this
 directory as a second plugin. They are not run by this repository's CI, which
 has no WordPress: see `.github/workflows/ci.yml`.
 
+## Developing against a real licence
+
+Three constants make the SDK usable on a test site. **All three belong in that
+site's `wp-config.php` and nowhere else** — not in this repository, not in CI,
+not in a `.env` that someone might commit:
+
+```php
+define( 'WP_FS__DEV_MODE', true );
+define( 'WP_FS__SKIP_EMAIL_ACTIVATION', true );
+define( 'WP_FS__debloater-pro_SECRET_KEY', '…' );
+```
+
+The first two only change how the SDK behaves locally. The third is the
+product's **secret** key, and it is a different value from the public key in
+`config/freemius.php.dist` — that one is handed to every browser that loads the
+licensing UI and is not a secret at all.
+
+CI fails if a secret key with a value assigned to it appears anywhere in this
+repository, including in a file somebody added in a hurry. That check is
+fail-probed, so it is known to work rather than assumed to.
+
+If you need a local override of the product id or public key, copy
+`config/freemius.php.dist` to `config/freemius.php`. That file is gitignored
+and excluded from packages, so a local experiment cannot become a release.
+
 ## Licensing
 
 Entitlement comes through `EntitlementProvider`, and the first implementation
