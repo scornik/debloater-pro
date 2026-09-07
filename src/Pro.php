@@ -50,7 +50,7 @@ final class Pro {
 	/**
 	 * Version.
 	 */
-	public const VERSION = '0.1.1';
+	public const VERSION = '0.2.0';
 
 	/**
 	 * The free plugin.

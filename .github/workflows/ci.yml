@@ -225,6 +225,43 @@ jobs:
         if: always()
         run: npx wp-env stop
 
+  # The release archive, and the rule that it cannot ship changed code under an
+  # unchanged version number.
+  #
+  # Pro had neither a packaging job nor a shipped-content record until now, and
+  # no tags at all -- so nothing could tell whether its code had moved since the
+  # version last did. It had, repeatedly.
+  package:
+    name: Package
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: json, sodium, zip
+          coverage: none
+
+      - run: npm ci
+
+      # The Freemius SDK ships inside the plugin, so it is a runtime dependency
+      # and --no-dev keeps everything else out.
+      - name: Production dependencies
+        run: composer install --no-interaction --no-progress --no-dev --classmap-authoritative
+
+      - run: npm run plugin-zip
+
+      - name: Content and version agree
+        run: node tools/version-discipline.mjs
+
   secrets:
     name: Nothing secret ships
     runs-on: ubuntu-latest

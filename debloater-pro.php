@@ -3,7 +3,7 @@
  * Plugin Name:       Debloater Pro
  * Plugin URI:        https://github.com/scornik/debloater
  * Description:       Workflow for people who manage several sites: scans on a schedule, drift detection between them, a printable before/after report, and applying a saved profile in one step. Adds nothing to what Debloater does to a site.
- * Version:           0.1.1
+ * Version:           0.2.0
  * Requires at least: 6.5
  * Requires PHP:      8.1
  * Requires Plugins:  debloater
