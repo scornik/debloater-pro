@@ -15,9 +15,12 @@ does to a site.
 
 Scans on a schedule, so a site is checked without somebody remembering to.
 Drift detection, so you are told what changed since the last scan rather than
-having to compare two reports yourself. A saved profile, so "apply" means the
-same thing on every site you run. A printable before and after report, with
-your own name on it.
+having to compare two reports yourself. Portable profiles, so you save a setup
+once and take it to every site you manage. A printable before and after report,
+with your own name on it.
+
+Each site still shows you the preview and asks before anything is applied.
+Nothing is pushed to a site from somewhere else.
 
 Everything to do with safety stays in Debloater itself: the recovery point
 taken before a change, the verification afterwards, the automatic rollback when
