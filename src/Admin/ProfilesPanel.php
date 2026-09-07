@@ -123,7 +123,8 @@ final class ProfilesPanel {
 
 		echo '<table class="widefat striped debloater-pro-profiles"><thead><tr>';
 		printf( '<th>%s</th>', esc_html__( 'Profile', 'debloater-pro' ) );
-		printf( '<th>%s</th>', esc_html__( 'Changes', 'debloater-pro' ) );
+		printf( '<th>%s</th>', esc_html__( 'Type', 'debloater-pro' ) );
+		printf( '<th>%s</th>', esc_html__( 'What it applies', 'debloater-pro' ) );
 		printf( '<th>%s</th>', esc_html__( 'Actions', 'debloater-pro' ) );
 		echo '</tr></thead><tbody>';
 
@@ -156,18 +157,25 @@ final class ProfilesPanel {
 	 */
 	private function renderRow( string $id, Profile $profile, bool $builtin ): void {
 		echo '<tr><td>';
-
 		echo esc_html( $profile->name );
+		echo '</td><td>';
 
-		if ( $builtin ) {
-			printf(
-				' <span class="description">%s</span>',
-				esc_html__( 'built in', 'debloater-pro' )
-			);
-		}
+		// Its own cell, not a badge appended to the name.
+		//
+		// It was `<span class="description">built in</span>` after the name,
+		// with a space in the markup -- and it read as "Maximumbuilt in" on the
+		// screen, because WordPress gives `.description` block display inside a
+		// table and the line break between them is not a space. The markup was
+		// right and the rendering was wrong, which is the sort of thing only
+		// looking at the page catches.
+		echo esc_html(
+			$builtin
+				? __( 'Built in', 'debloater-pro' )
+				: __( 'Saved here', 'debloater-pro' )
+		);
 
 		echo '</td><td>';
-		echo esc_html( (string) $profile->count() );
+		echo esc_html( $this->applies( $id, $profile, $builtin ) );
 		echo '</td><td>';
 
 		$this->button( $id, 'apply', __( 'Apply', 'debloater-pro' ) );
@@ -185,6 +193,58 @@ final class ProfilesPanel {
 		}
 
 		echo '</td></tr>';
+	}
+
+	/**
+	 * What a profile actually applies, in words.
+	 *
+	 * A saved profile is a fixed list, so the number of changes is the whole
+	 * answer.
+	 *
+	 * A built-in one is not. `safe`, `performance` and `maximum` are defined by
+	 * the risk bands they admit rather than by naming tweaks -- every one of
+	 * them carries `tweaks: []` -- so what they apply depends on what the scan
+	 * found on *that* site. Their count is genuinely zero, and printing `0`
+	 * under a column headed "Changes" said they did nothing.
+	 *
+	 * So the column says what it applies, and for a built-in that is the bands.
+	 *
+	 * @param string  $id      Profile id.
+	 * @param Profile $profile The profile.
+	 * @param bool    $builtin Whether it came from the registry.
+	 * @return string
+	 */
+	private function applies( string $id, Profile $profile, bool $builtin ): string {
+		if ( ! $builtin ) {
+			return sprintf(
+				/* translators: %d: how many changes the profile names. */
+				_n( '%d change', '%d changes', $profile->count(), 'debloater-pro' ),
+				$profile->count()
+			);
+		}
+
+		$definition = $this->pro->profiles()[ $id ] ?? null;
+		$bands      = array();
+
+		if ( $definition && property_exists( $definition, 'include_risk' ) ) {
+			foreach ( $definition->include_risk as $risk ) {
+				$bands[] = is_object( $risk ) && property_exists( $risk, 'value' )
+					? (string) $risk->value
+					: (string) $risk;
+			}
+		}
+
+		if ( array() === $bands ) {
+			// A registry profile this cannot read the bands of. Saying so beats
+			// printing a zero that reads as "does nothing".
+			return __( 'whatever the scan finds', 'debloater-pro' );
+		}
+
+		return sprintf(
+			/* translators: %s: a comma-separated list of risk levels, such as "safe, low". */
+			__( 'whatever the scan finds at risk: %s', 'debloater-pro' ),
+			implode( ', ', $bands )
+		);
 	}
 
 	/**

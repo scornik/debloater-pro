@@ -95,12 +95,100 @@ final class ProProfilesPanelTest extends IntegrationTestCase {
 		$markup = $this->render();
 
 		$this->assertStringContainsString( 'Profiles', $markup );
-		$this->assertStringContainsString( 'built in', $markup );
+
+		// The type is its own cell now, not a badge glued to the name. The
+		// lowercase 'built in' this used to look for was the badge.
+		$this->assertStringContainsString( '<td>Built in</td>', $markup );
 
 		// Every profile the registry defines is on the page, by name.
 		foreach ( $this->pro->profileStore()->builtins() as $profile ) {
 			$this->assertStringContainsString( esc_html( $profile->name ), $markup );
 		}
+	}
+
+	/**
+	 * The table says what each row is, in cells rather than in a badge.
+	 *
+	 * Reported from a live install: the built-in rows read "Maximumbuilt in",
+	 * "Performancebuilt in", "Safebuilt in", and all three showed 0 changes.
+	 *
+	 * The markup was `Maximum <span class="description">built in</span>` --
+	 * correct, space and all. WordPress gives `.description` block display
+	 * inside a table, so the badge landed on its own line and the text came out
+	 * with no separator at all. Markup right, rendering wrong, which nothing
+	 * short of looking at the page would have caught.
+	 *
+	 * So the type is its own cell. This pins the cells rather than the styling,
+	 * because the styling is WordPress's and may change again.
+	 *
+	 * @return void
+	 */
+	public function test_a_row_says_what_it_is_in_its_own_cell(): void {
+		$this->save( 'Client baseline' );
+
+		$markup = $this->render();
+
+		// No badge appended to a name, in any row.
+		$this->assertStringNotContainsString( '<span class="description">', $markup );
+
+		// Every built-in row: name, then type, as separate cells.
+		foreach ( array( 'Safe', 'Performance', 'Maximum' ) as $name ) {
+			$this->assertStringContainsString(
+				sprintf( '<td>%s</td><td>Built in</td>', $name ),
+				$markup,
+				sprintf( 'the %s row should carry its type in its own cell', $name )
+			);
+		}
+
+		$this->assertStringContainsString(
+			'<td>Client baseline</td><td>Saved here</td>',
+			$markup
+		);
+	}
+
+	/**
+	 * A built-in shows what it applies, not a zero.
+	 *
+	 * The zero was correct and read as an error. `safe`, `performance` and
+	 * `maximum` all carry `tweaks: []` and are defined by the risk bands they
+	 * admit, so they have no fixed selection and their count really is nought --
+	 * what they apply depends on what the scan found. Under a column headed
+	 * "Changes", `0` said they did nothing.
+	 *
+	 * @return void
+	 */
+	public function test_a_builtin_shows_its_risk_bands_rather_than_zero(): void {
+		$markup = $this->render();
+
+		$this->assertStringContainsString( 'What it applies', $markup );
+
+		// Read from the registry, not written here: safe admits two bands and
+		// maximum admits four, so a wrong lookup cannot pass by coincidence.
+		$this->assertStringContainsString(
+			'whatever the scan finds at risk: safe, low</td>',
+			$markup
+		);
+		$this->assertStringContainsString(
+			'whatever the scan finds at risk: safe, low, medium, high</td>',
+			$markup
+		);
+
+		// And the count really is zero, so the label is the fix and not a
+		// cover for a broken count.
+		foreach ( $this->pro->profileStore()->builtins() as $builtin ) {
+			$this->assertSame( 0, $builtin->count() );
+		}
+	}
+
+	/**
+	 * A saved profile still shows how many changes it names.
+	 *
+	 * @return void
+	 */
+	public function test_a_saved_profile_counts_its_changes(): void {
+		$this->save( 'Client baseline' );
+
+		$this->assertStringContainsString( '<td>1 change</td>', $this->render() );
 	}
 
 	/**
