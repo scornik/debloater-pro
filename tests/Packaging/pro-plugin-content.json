@@ -268,12 +268,21 @@
         "debloater-pro/src/Entitlement/FreemiusEntitlementProvider.php",
         "debloater-pro/src/Pro.php"
       ]
+    },
+    {
+      "version": "0.2.1",
+      "why": "0.2.1: re-recorded from a correct build. The first 0.2.1 record was generated from an archive built before the readme short description was corrected, and 0.2.1 has never been uploaded anywhere, so no site has the older bytes.",
+      "added": [],
+      "removed": [],
+      "changed": [
+        "debloater-pro/readme.txt"
+      ]
     }
   ],
   "entries": {
     "debloater-pro/config/freemius.php.dist": "6b7c4cf726a3919bf2c72f7b4f44c62ba30c008686ec0968c372d992439cf405",
     "debloater-pro/debloater-pro.php": "75e452dfa21a036124fdaaa267f8b8867607cb6c4e0d99b1cffad18e2eecd395",
-    "debloater-pro/readme.txt": "45edfcdc18410fcfd96480c790a8f10cad9cb4dbb5a0b0c50f13fae793d676fa",
+    "debloater-pro/readme.txt": "369a3c4e76079755b620c1f723688c683de29a92320fea221a0559e404d1feac",
     "debloater-pro/src/Admin/ProfilesPanel.php": "dc025742a4157cb2dbe148ccbc8d3bbf5dd2a8ef56390330780afd2db256353a",
     "debloater-pro/src/Admin/Screen.php": "713617a18b9258d02366d9b8bc33b4047fd6ebace98648007bff432efa6d872d",
     "debloater-pro/src/Cloud/CloudResponse.php": "bab1f60f536562a86889fc8cfcc2e23da9ac42c4fe7530111ae8986a12895551",
