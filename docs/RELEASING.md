@@ -93,17 +93,33 @@ node tools/record-shipped-content.mjs --why "0.2.0: <what changed>"
 
 Commit the regenerated record with the release.
 
-### 7. Tag
+### 7. Tag, in the same breath as the commit
 
 ```bash
 git tag -a vX.Y.Z -m "Debloater Pro X.Y.Z"
 git push --follow-tags
 ```
 
-**This repository has no tags at all.** It was created by the Pro split and
-nothing has ever been tagged in it, which is why the version check reads the
-content record rather than a tag. Starting now costs nothing and makes
-`git describe` mean something.
+**This is a release step, not something to get round to.** A release with no tag
+cannot be checked out later, `git describe` on `main` reports the wrong thing to
+everybody who runs it, and "what was in 0.2.0" has to be reconstructed from
+dates. All of those failures show up long after the release, to somebody who was
+not there.
+
+`--follow-tags` rather than a separate `git push --tags`: it pushes the
+annotated tag with the commit it names, so the two cannot arrive separately or
+one of them not at all.
+
+This repository had no tags at all until `v0.2.0` — it was created by the Pro
+split and nothing was ever tagged in it, which is why the version check reads
+the content record rather than a tag. That reason has not changed; the tag is
+for people, and the record is for the build.
+
+`v0.2.0` is tagged at the commit where the four version locations moved
+together, which is the first commit whose tree the content record describes.
+The versions before it are deliberately untagged: there is no commit whose tree
+is honestly 0.1.1, its content record having later been found misdated, and a
+tag saying otherwise would be one no build could confirm.
 
 ### 8. Deploy to Freemius
 
