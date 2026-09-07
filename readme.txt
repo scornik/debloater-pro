@@ -6,7 +6,7 @@ Stable tag: 0.2.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Workflow for people who run Debloater on more than one site: scheduled scans, drift detection, a saved profile and a printable before/after report.
+Workflow for people who run Debloater on more than one site: scheduled scans, drift detection, portable profiles and a printable before/after report.
 
 == Description ==
 
