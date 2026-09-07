@@ -245,6 +245,101 @@ final class ProArchitectureTest extends TestCase {
 	}
 
 	/**
+	 * Rule 15, sharpened: Pro contains no way to apply anything.
+	 *
+	 * Pro used to have `Features/BulkApply.php`, which planned and applied a
+	 * profile by calling the free plugin's own `preview()` and `apply()`. It was
+	 * careful -- it checked a confirmation token for the exact plan, and it
+	 * refused destructive operations -- and it was deleted anyway (D-0068).
+	 *
+	 * The reasoning is Phase 19c-2's, applied to the thing it was originally
+	 * written about. When the profiles panel was built, planning and applying
+	 * inside Pro was rejected because a second route into applying is a route
+	 * that can be taken without the first one's checks, whatever the intentions
+	 * of whoever edits it next year. That argument does not stop being true for
+	 * a route nobody has wired up yet: an unreachable implementation is an
+	 * invitation to reach it.
+	 *
+	 * So the literals below, not a constant and not a class name. A constant
+	 * renames with the thing it names; what has to stay absent from this
+	 * repository is the *call*.
+	 *
+	 * @return void
+	 */
+	public function test_pro_cannot_apply_anything(): void {
+		// `->apply(` is the free plugin's apply entry point as Pro would have to
+		// write it. `ConfirmationToken` and `matchesPlan` are how a caller would
+		// satisfy the token check on the way there, so their presence means
+		// something is preparing to apply even if the call itself has moved.
+		$forbidden = array(
+			'->apply(',
+			'ConfirmationToken',
+			'matchesPlan',
+			'previewTweaks(',
+		);
+
+		$offenders = array();
+
+		foreach ( $this->sources() as $path => $source ) {
+			if ( ! str_starts_with( $path, 'pro/' ) ) {
+				continue;
+			}
+
+			$code = $this->withoutComments( $source );
+
+			foreach ( $forbidden as $needle ) {
+				if ( str_contains( $code, $needle ) ) {
+					$offenders[] = $path . ' contains ' . $needle;
+				}
+			}
+		}
+
+		$this->assertSame(
+			array(),
+			$offenders,
+			"Pro must contain no path into applying. Debloater applies; Pro asks it to.\n"
+				. implode( "\n", $offenders )
+		);
+
+		// And the free plugin really does have the thing being kept out, so
+		// this cannot pass because the needle stopped existing anywhere.
+		$from_free = array_filter(
+			$this->sources(),
+			static fn ( string $path ): bool => str_starts_with( $path, 'free/' ),
+			ARRAY_FILTER_USE_KEY
+		);
+
+		$free = implode( "\n", $from_free );
+
+		$this->assertStringContainsString( 'ConfirmationToken', $free );
+		$this->assertStringContainsString( '->apply(', $free );
+	}
+
+	/**
+	 * The deleted class stays deleted.
+	 *
+	 * @return void
+	 */
+	public function test_bulk_apply_is_gone(): void {
+		$this->assertFileDoesNotExist(
+			$this->path( 'src/Features/BulkApply.php' ),
+			'BulkApply was removed in D-0068 rather than given an interface.'
+		);
+
+		foreach ( $this->sources() as $path => $source ) {
+			if ( ! str_starts_with( $path, 'pro/' ) ) {
+				continue;
+			}
+
+			$this->assertStringNotContainsString(
+				'BulkApply',
+				$this->withoutComments( $source ),
+				$path . ' still names BulkApply.'
+			);
+		}
+	}
+
+	/**
 	 * Nothing off the network is executed.
 	 *
 	 * @return void

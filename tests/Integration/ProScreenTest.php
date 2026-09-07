@@ -59,7 +59,6 @@ final class ProScreenTest extends IntegrationTestCase {
 	public function tear_down(): void {
 		$this->pro->scans()->unschedule();
 
-		delete_option( 'debloater_pro_saved_profile' );
 		delete_option( 'debloater_pro_scan_schedule' );
 		delete_option( 'debloater_pro_report_branding' );
 
@@ -181,24 +180,6 @@ final class ProScreenTest extends IntegrationTestCase {
 
 		$this->assertSame( '', $this->pro->scans()->frequency() );
 		$this->assertFalse( wp_next_scheduled( ScheduledScans::HOOK ) );
-	}
-
-	/**
-	 * A profile that does not exist is refused rather than stored.
-	 *
-	 * `BulkApply` keeps the option and the check; what changed in Phase 19c is
-	 * who writes it. The dropdown wrote it on Save, and the profiles panel
-	 * writes it when somebody presses Apply, which is a plainer statement of
-	 * which profile they meant.
-	 *
-	 * @return void
-	 */
-	public function test_an_unknown_profile_is_refused(): void {
-		$this->assertFalse( $this->pro->bulk()->save( 'not-a-profile' ) );
-		$this->assertSame( '', $this->pro->bulk()->saved() );
-
-		$this->assertTrue( $this->pro->bulk()->save( 'safe' ) );
-		$this->assertSame( 'safe', $this->pro->bulk()->saved() );
 	}
 
 	/**

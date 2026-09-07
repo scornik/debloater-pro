@@ -58,7 +58,7 @@ final class FixtureEntitlementProvider implements EntitlementProvider {
 				'scheduled_scans',
 				'drift_detection',
 				'white_label_report',
-				'bulk_apply',
+				'portable_profiles',
 				'priority_registry',
 				'multisite',
 			)

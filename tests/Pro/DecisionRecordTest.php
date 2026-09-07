@@ -45,6 +45,7 @@ final class DecisionRecordTest extends TestCase {
 		'D-0062',
 		'D-0064',
 		'D-0065',
+		'D-0068',
 	);
 
 	/**

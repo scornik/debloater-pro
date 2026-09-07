@@ -12,8 +12,8 @@ namespace Debloater\Tests\Integration;
 use Debloater\Pro\Cloud\CloudResponse;
 use Debloater\Pro\Cloud\CloudServiceClient;
 use Debloater\Pro\Cloud\HakeemifyCloudClient;
+use Debloater\Pro\Admin\ProfilesPanel;
 use Debloater\Pro\Entitlement\FixtureEntitlementProvider;
-use Debloater\Pro\Features\BulkApply;
 use Debloater\Pro\Features\ScheduledScans;
 use Debloater\Pro\Pro;
 
@@ -143,9 +143,9 @@ final class ProIntegrationTest extends IntegrationTestCase {
 		$this->assertSame( '', $pro->report()->render( 1 ) );
 
 		// And, the one that matters: no apply.
-		$this->assertNull(
-			$pro->bulk()->apply( str_repeat( 'a', 64 ) ),
-			'A missing entitlement must never result in a change to the site.'
+		$this->assertFalse(
+			$pro->entitlement()->entitlement()->allows( ProfilesPanel::FEATURE ),
+			'without an entitlement the profiles panel is not offered.'
 		);
 
 		// The free plugin is untouched by any of it.
@@ -273,37 +273,6 @@ final class ProIntegrationTest extends IntegrationTestCase {
 			$this->pro->drift()->latest(),
 			'Reporting "nothing changed" from one scan would be an invented reassurance.'
 		);
-	}
-
-	/**
-	 * Bulk apply refuses a confirmation that was not issued for the plan.
-	 *
-	 * @return void
-	 */
-	public function test_bulk_apply_refuses_a_stale_confirmation(): void {
-		$this->plugin->scan();
-
-		$this->assertTrue( $this->pro->bulk()->save( 'safe' ) );
-		$this->assertSame( 'safe', $this->pro->bulk()->saved() );
-
-		$before = $this->siteFingerprint();
-
-		$this->assertNull(
-			$this->pro->bulk()->apply( str_repeat( 'a', 64 ) ),
-			'§13 rule 8: a token that was not issued for this plan must be refused.'
-		);
-
-		$this->assertSame( $before, $this->siteFingerprint() );
-	}
-
-	/**
-	 * A profile that does not exist cannot be saved.
-	 *
-	 * @return void
-	 */
-	public function test_bulk_apply_will_not_save_an_unknown_profile(): void {
-		$this->assertFalse( $this->pro->bulk()->save( 'not-a-profile' ) );
-		$this->assertSame( '', $this->pro->bulk()->saved() );
 	}
 
 	/**

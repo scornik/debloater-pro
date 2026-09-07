@@ -51,7 +51,7 @@ final class EntitlementTest extends TestCase {
 		$this->assertTrue( $entitlement->isEmpty() );
 		$this->assertSame( 'freemius-absent', $entitlement->source );
 
-		foreach ( array( 'scheduled_scans', 'drift_detection', 'bulk_apply', 'multisite' ) as $feature ) {
+		foreach ( array( 'scheduled_scans', 'drift_detection', 'portable_profiles', 'multisite' ) as $feature ) {
 			$this->assertFalse( $entitlement->allows( $feature ) );
 		}
 	}
@@ -132,11 +132,11 @@ final class EntitlementTest extends TestCase {
 		$provider = new FixtureEntitlementProvider( array( 'drift_detection' ) );
 
 		$this->assertTrue( $provider->entitlement()->allows( 'drift_detection' ) );
-		$this->assertFalse( $provider->entitlement()->allows( 'bulk_apply' ) );
+		$this->assertFalse( $provider->entitlement()->allows( 'portable_profiles' ) );
 
 		$everything = FixtureEntitlementProvider::everything();
 
-		foreach ( array( 'scheduled_scans', 'drift_detection', 'white_label_report', 'bulk_apply', 'priority_registry', 'multisite' ) as $feature ) {
+		foreach ( array( 'scheduled_scans', 'drift_detection', 'white_label_report', 'portable_profiles', 'priority_registry', 'multisite' ) as $feature ) {
 			$this->assertTrue( $everything->entitlement()->allows( $feature ) );
 		}
 
@@ -170,14 +170,14 @@ final class EntitlementTest extends TestCase {
 
 		$good = Entitlement::fromArray(
 			array(
-				'features'   => array( 'bulk_apply' ),
+				'features'   => array( 'portable_profiles' ),
 				'expires_at' => 12345,
 				'source'     => 'test',
 			)
 		);
 
 		$this->assertInstanceOf( Entitlement::class, $good );
-		$this->assertTrue( $good->allows( 'bulk_apply' ) );
+		$this->assertTrue( $good->allows( 'portable_profiles' ) );
 	}
 
 	/**
@@ -187,12 +187,13 @@ final class EntitlementTest extends TestCase {
 	 */
 	public function test_feature_lists_are_normalised(): void {
 		$entitlement = new Entitlement(
-			array( 'bulk_apply', '', 'bulk_apply', 42, null, array( 'nested' ), 'drift_detection' ),
+			array( 'portable_profiles', '', 'portable_profiles', 42, null, array( 'nested' ), 'drift_detection' ),
 			0,
 			'test'
 		);
 
-		$this->assertSame( array( 'bulk_apply', 'drift_detection' ), $entitlement->features );
+		// Sorted, so the order is the alphabet's rather than the caller's.
+		$this->assertSame( array( 'drift_detection', 'portable_profiles' ), $entitlement->features );
 	}
 
 	/**
@@ -201,7 +202,7 @@ final class EntitlementTest extends TestCase {
 	 * @return void
 	 */
 	public function test_an_entitlement_round_trips(): void {
-		$original = new Entitlement( array( 'drift_detection', 'bulk_apply' ), 999, 'freemius' );
+		$original = new Entitlement( array( 'drift_detection', 'portable_profiles' ), 999, 'freemius' );
 		$restored = Entitlement::fromArray( $original->toArray() );
 
 		$this->assertInstanceOf( Entitlement::class, $restored );

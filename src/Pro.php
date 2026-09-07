@@ -21,7 +21,6 @@ use Debloater\Pro\Entitlement\EntitlementProvider;
 use Debloater\Pro\Entitlement\FixtureEntitlementProvider;
 use Debloater\Pro\Entitlement\FreemiusEntitlementProvider;
 use Debloater\Pro\Features\BeforeAfterReport;
-use Debloater\Pro\Features\BulkApply;
 use Debloater\Pro\Features\DriftDetector;
 use Debloater\Pro\Features\RegistryChannel;
 use Debloater\Pro\Features\ScheduledScans;
@@ -38,8 +37,8 @@ use Debloater\Pro\Multisite\NetworkDefaults;
  *
  * Read that list of features and notice what is not in it. Nothing here makes
  * the site safer, and nothing here makes it less safe. Scheduled scans, drift
- * detection, a printable report, applying a saved profile in one step, and
- * getting registry updates sooner are all *workflow*: they save an agency time
+ * detection, a printable report, portable profiles, and getting registry
+ * updates sooner are all *workflow*: they save an agency time
  * on sites they already manage. The recovery points, the verification, the
  * automatic rollback, the risk rules and the refusal to delete without a
  * backup are in the free plugin and stay there, because safety is never
@@ -95,13 +94,6 @@ final class Pro {
 	private BeforeAfterReport $report;
 
 	/**
-	 * Applying a saved profile.
-	 *
-	 * @var BulkApply
-	 */
-	private BulkApply $bulk;
-
-	/**
 	 * The priority registry channel.
 	 *
 	 * @var RegistryChannel
@@ -144,7 +136,6 @@ final class Pro {
 		$this->scans   = new ScheduledScans( $plugin, $this->entitlement );
 		$this->drift   = new DriftDetector( $plugin );
 		$this->report  = new BeforeAfterReport( $plugin, $this->entitlement );
-		$this->bulk    = new BulkApply( $plugin, $this->entitlement );
 		$this->channel = new RegistryChannel( $this->entitlement );
 		$this->network = new NetworkDefaults( $this->entitlement );
 		$this->screen  = new Screen( $this );
@@ -264,15 +255,6 @@ final class Pro {
 	 */
 	public function report(): BeforeAfterReport {
 		return $this->report;
-	}
-
-	/**
-	 * Applying a saved profile.
-	 *
-	 * @return BulkApply
-	 */
-	public function bulk(): BulkApply {
-		return $this->bulk;
 	}
 
 	/**

@@ -11,7 +11,6 @@ namespace Debloater\Pro\Admin;
 
 use Debloater\Brand;
 use Debloater\Pro\Features\BeforeAfterReport;
-use Debloater\Pro\Features\BulkApply;
 use Debloater\Pro\Features\ScheduledScans;
 use Debloater\Pro\Pro;
 use Debloater\Security\Capabilities;
@@ -32,9 +31,9 @@ use Debloater\Security\Capabilities;
  *
  * Everything here is behind the same capability as the free plugin, and every
  * post is nonce-checked (BUILD-SPEC §13 rules 1 and 2). Applying goes through
- * `BulkApply`, which goes through the free plugin's own preview and apply, so
- * the recovery point, the verification and the automatic rollback all happen
- * exactly as they do everywhere else.
+ * a link to Debloater's own preview, so the recovery point, the verification
+ * and the automatic rollback all happen exactly as they do everywhere else.
+ * Pro contains no apply path of its own -- see docs/DECISIONS.md D-0068.
  */
 final class Screen {
 
@@ -238,7 +237,7 @@ final class Screen {
 		// After the form, and not inside it. Each row of the panel is a form of
 		// its own — a rename posts a name, a delete posts nothing else — and a
 		// form nested in a form is markup no browser agrees about.
-		if ( $entitlement->allows( BulkApply::FEATURE ) ) {
+		if ( $entitlement->allows( ProfilesPanel::FEATURE ) ) {
 			$this->profiles->render();
 		}
 

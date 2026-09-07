@@ -69,6 +69,16 @@ final class ProfilesPanel {
 	public const PRESELECT = 'debloater_profile';
 
 	/**
+	 * The entitlement this panel needs.
+	 *
+	 * Was `bulk_apply`, when Pro had a class that could apply a profile itself.
+	 * That class is gone (D-0068) and the capability it was named for was never
+	 * the point: what Pro sells here is a profile that travels between sites,
+	 * and the applying belongs to Debloater.
+	 */
+	public const FEATURE = 'portable_profiles';
+
+	/**
 	 * Pro.
 	 *
 	 * @var Pro
@@ -340,8 +350,6 @@ final class ProfilesPanel {
 		}
 
 		if ( 'apply' === $do && null !== $profile ) {
-			$this->remember( $id );
-
 			$this->leave( $this->previewUrl( $id ) );
 		}
 
@@ -401,27 +409,6 @@ final class ProfilesPanel {
 		// 'apply' and 'export' are handled before this and never arrive here;
 		// anything else is a request nobody's browser sent.
 		return 'profile-unknown-action';
-	}
-
-	/**
-	 * Note which profile was last meant, for `BulkApply`.
-	 *
-	 * This is the whole of what the dropdown did — "remembers which one you
-	 * meant" — kept inside the thing that replaced it. Choosing Apply is a
-	 * clearer statement of which one you meant than picking it from a list and
-	 * pressing Save, and it means `BulkApply` still has something writing the
-	 * option it reads rather than becoming a feature with no way in.
-	 *
-	 * Only registry profiles are storable there: it plans by profile id and a
-	 * site's own saved profile is a selection rather than a name the planner
-	 * knows. `BulkApply::save()` says so by returning false, and nothing here
-	 * needs to care which kind this was.
-	 *
-	 * @param string $id Profile id.
-	 * @return void
-	 */
-	private function remember( string $id ): void {
-		$this->pro->bulk()->save( $id );
 	}
 
 	/**

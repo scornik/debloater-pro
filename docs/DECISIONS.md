@@ -133,8 +133,6 @@ that would be expensive to discover late, and they cost nothing to check now.
 
 ---
 
----
-
 ## D-0050 — how Pro attaches to the free plugin
 
 - **Phase:** 19
@@ -197,8 +195,6 @@ still faces the same signature check either way.
   keeping.
 - Pro lives in `pro/`, is never in the free zip's allow-list, and carries its own
   hand-written autoloader so it adds no dependency either.
-
----
 
 ---
 
@@ -293,8 +289,6 @@ not a thing to do.
 
 ---
 
----
-
 ## D-0061 – what white-label actually does, and what we may promise
 
 - **Phase:** 19b, part 2, after launch testing
@@ -346,8 +340,6 @@ somebody sends back.
 
 ---
 
----
-
 ## D-0062 – the commerce path is verified end to end
 
 - **Phase:** 19b, part 2
@@ -391,9 +383,13 @@ next person to read it should know how old the evidence is.
 
 ---
 
----
-
 ## D-0064 – Pro chooses a profile; Debloater applies it
+
+> **Superseded in part by `D-0068`.** The last section below said
+> `BulkApply` keeps its option and Apply writes it. That class is deleted;
+> nothing writes the option and nothing reads it. The decision this record
+> exists for — Pro chooses, Debloater applies — is unchanged and now has no
+> second route to route around.
 
 - **Phase:** 19c
 - **Date:** 2026-09-06
@@ -456,19 +452,18 @@ Duplicate *is* offered for a built-in, because copying `Safe` and adjusting the
 copy is how somebody starts. The copy is an ordinary saved profile from the
 moment it exists.
 
-### `BulkApply` keeps its option, and Apply writes it
+### `BulkApply` kept its option — and then went
 
-`Features\BulkApply` is unchanged: same option, same registry check, same
-`apply()` that takes a confirmation token for the exact plan. What changed is
-who writes the option. The dropdown wrote it when you pressed Save; the panel
-writes it when you press Apply, which is a plainer statement of which profile
-you meant than picking one from a list and saving a form.
+This section used to record that `Features\BulkApply` was unchanged and that
+Apply wrote the option it read, so the class still had something feeding it.
 
-Saved profiles are not storable there, because `BulkApply` plans by profile id
-and a site's own profile is a selection rather than a name the planner knows.
-`save()` says so by returning false, and the panel does not need to care.
+That was the argument for keeping a route into applying alive inside Pro, and
+`D-0068` rejected it: the class was reachable from nothing a customer could
+press, and an unreachable apply path is an invitation to reach it. It is
+deleted. The option is written by nothing and read by nothing.
 
----
+What this record decided stands, and stands more plainly for it: Pro chooses a
+profile, and Debloater applies it.
 
 ---
 
@@ -536,3 +531,68 @@ gone, and a step asserts the tree is really there before the suite runs. A
 second step fails the build if anything skipped.
 
 ---
+
+## D-0068 – Pro has no apply path, so the unreachable one is deleted
+
+- **Phase:** 0.2.0 follow-up
+- **Date:** 2026-09-07
+- **Status:** accepted
+- **Extends:** `D-0064`, which decided that Pro chooses a profile and Debloater
+  applies it.
+
+### What was there
+
+`Features/BulkApply.php`: a class that read a saved registry profile, called the
+free plugin's `preview()`, checked a confirmation token for that exact plan, and
+called `apply()`. It was careful. It refused destructive operations, it refused
+a stale token, and it had no cron hook, so nothing ran unattended.
+
+It was also reachable from nothing. The dropdown that stored its profile was
+replaced by the profiles panel in Phase 19c-2, and the panel links to
+Debloater's preview instead. `apply()` had no caller but its own tests.
+
+### The decision
+
+**Deleted, rather than given an interface.**
+
+Phase 19c-2 already rejected exactly this route when the panel was built:
+planning and applying inside Pro was within reach and one click shorter, and it
+was refused because a second route into applying is a route that can be taken
+without the first one's checks, whatever the intentions of whoever edits it next
+year.
+
+That argument does not stop applying to a route nobody has wired up yet. An
+unreachable implementation of the thing we decided not to have is an invitation
+to reach it — and the person who wires it up in a year will find a class that
+looks finished, tested and safe, and will not find the paragraph explaining why
+it was left alone.
+
+### What Pro actually sells here
+
+The capability was never "apply in bulk". It is that **a profile travels**:
+export a setup from one site, import it on another, look at what it would do
+there, and apply it through Debloater's ordinary preview. That works today, on
+any number of sites, and none of it needs Pro to be able to apply anything.
+
+The entitlement key is `portable_profiles` for the same reason. `bulk_apply`
+named a mechanism that no longer exists; this names the thing a customer gets.
+
+### What stops it coming back
+
+`ProArchitectureTest::test_pro_cannot_apply_anything` fails if any file in Pro
+contains `->apply(`, `ConfirmationToken`, `matchesPlan` or `previewTweaks(`.
+
+Literals, not constants: a constant renames along with the thing it names, and
+what has to stay out of this repository is the *call*. The same test asserts
+those strings are present in the free plugin, so it cannot pass by the needle
+having disappeared everywhere.
+
+### What this costs
+
+Nothing a customer could reach. It removes a line from the marketing copy —
+"bulk apply of a saved profile" — which was describing something no customer
+could do, so removing it makes the copy true rather than smaller.
+
+Cross-site *sync* — one place that pushes a profile to many sites — remains
+deferred to the cloud phase, as `D-0063` says. It is not this, and nothing
+should imply it is.

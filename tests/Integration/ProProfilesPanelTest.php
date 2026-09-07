@@ -70,7 +70,6 @@ final class ProProfilesPanelTest extends IntegrationTestCase {
 	 */
 	public function tear_down(): void {
 		delete_option( ProfileStore::OPTION );
-		delete_option( 'debloater_pro_saved_profile' );
 
 		wp_set_current_user( 0 );
 
