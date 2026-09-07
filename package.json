@@ -1,6 +1,6 @@
 {
   "name": "debloater-pro",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Workflow features for people who run Debloater on more than one site.",
   "license": "GPL-2.0-or-later",
   "private": true,

@@ -49,7 +49,7 @@ final class Pro {
 	/**
 	 * Version.
 	 */
-	public const VERSION = '0.2.0';
+	public const VERSION = '0.2.1';
 
 	/**
 	 * The free plugin.

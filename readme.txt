@@ -2,7 +2,7 @@
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.2.0
+Stable tag: 0.2.1
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -30,6 +30,17 @@ is here, and none of it is behind a licence.
 Requires the free Debloater plugin, which does the actual work.
 
 == Changelog ==
+
+= 0.2.1 =
+* The profiles table says what each row is and what it applies. The built-in
+  rows read "Maximumbuilt in" and showed 0 changes: the type is its own column
+  now, and a built-in says which risk levels it covers rather than a count it
+  does not have.
+* Removed an unused apply path. Nothing could reach it and nothing about what
+  Pro does changes -- applying a profile has always gone through Debloater's
+  own preview, and still does.
+* Clearer wording about what portable profiles are: a setup you save once and
+  take to every site you manage, previewed and confirmed on each site.
 
 = 0.2.0 =
 * Profiles panel, replacing the "Saved profile" dropdown: apply, export,
