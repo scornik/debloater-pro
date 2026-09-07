@@ -109,6 +109,74 @@ const hashOf = ( archive, name ) =>
 		.update( execFileSync( 'unzip', [ '-p', archive, name ], { maxBuffer: 1 << 28 } ) )
 		.digest( 'hex' );
 
+/**
+ * Refuse an archive that predates the code it is supposed to be a build of.
+ *
+ * This check reads a zip. It cannot tell whether that zip is a build of the
+ * working tree or of whatever the tree looked like the last time somebody ran
+ * the packaging step, and until this existed it did not ask.
+ *
+ * That is not hypothetical. `src/Features/BulkApply.php` was deleted, this
+ * check was run, and it reported "shipped content is unchanged" -- because it
+ * was comparing the *previous* build against the record that build was made
+ * from. Two files agreeing with each other, neither of them describing the
+ * code. CI never meets it, because CI builds the archive in the job that runs
+ * this; a person following docs/RELEASING.md meets it whenever they edit
+ * something after building.
+ *
+ * A check that quietly answers a question about the wrong file is worse than
+ * one that fails, because its answer is reassuring.
+ *
+ * ## What it compares against
+ *
+ * The paths in the record, mapped back to this repository -- that is exactly
+ * the set the archive ships, so a doc, a test or this file being newer than
+ * the zip is not staleness and does not refuse. `composer.lock` too, since the
+ * vendored dependencies ship and are not tracked individually.
+ *
+ * A brand-new shipped file that is in neither the record nor the archive is
+ * the one thing this cannot see. It is bounded: a new file arrives with an
+ * edit to something that already ships far more often than alone, and the
+ * archive built after it is compared by hash like everything else.
+ *
+ * @param {string}                 archive Path to the built archive.
+ * @param {Object<string, string>} entries The record's entries, by zip path.
+ */
+const refuseIfStale = ( archive, entries ) => {
+	const built = fs.statSync( archive ).mtimeMs;
+
+	// Zip paths carry the plugin directory as their first segment; the
+	// repository does not.
+	const shipped = Object.keys( entries )
+		.map( ( name ) => name.split( '/' ).slice( 1 ).join( '/' ) )
+		.filter( ( name ) => name !== '' && ! name.startsWith( 'vendor/' ) );
+
+	shipped.push( 'composer.lock' );
+
+	const newer = shipped.filter( ( name ) => {
+		const full = path.join( ROOT, name );
+
+		return fs.existsSync( full ) && fs.statSync( full ).mtimeMs > built;
+	} );
+
+	if ( 0 === newer.length ) {
+		return;
+	}
+
+	refuse( [
+		`${ path.relative( ROOT, archive ) } is older than ${ newer.length } file(s) ` +
+			'it ships, so it is not a build of this code.',
+		'',
+		...newer.slice( 0, 10 ).map( ( name ) => `  ${ name }` ),
+		...( newer.length > 10 ? [ `  and ${ newer.length - 10 } more` ] : [] ),
+		'',
+		'Comparing a stale archive against the record it was built from finds no',
+		'difference and means nothing. Rebuild, then run this again:',
+		'',
+		'    npm run plugin-zip',
+	] );
+};
+
 /* ------------------------------------------------------------------- run */
 
 const record = JSON.parse( fs.readFileSync( RECORD, 'utf8' ) );
@@ -167,6 +235,8 @@ if ( ! fs.existsSync( archive ) ) {
 }
 
 const recorded = record.entries ?? {};
+
+refuseIfStale( archive, recorded );
 const built = {};
 
 for ( const name of entries( archive ) ) {
