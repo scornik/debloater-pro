@@ -99,18 +99,23 @@ final class ProIntegrationTest extends IntegrationTestCase {
 	public function test_pro_changes_no_runtime_behaviour(): void {
 		$this->selectAndGenerate( array( 'core.remove_generator' => array() ) );
 
-		$without = (string) file_get_contents( $this->context()->runtimeFile() );
+		$without = $this->storedRuntime();
+
+		// Not empty, or the comparison below is two absences agreeing. The
+		// option is named by its literal (P4): if the free plugin renames it,
+		// this has to fail rather than compare nothing with nothing.
+		$this->assertStringContainsString( 'core-remove-generator.php', $without );
 
 		$this->pro->boot();
 
 		$this->selectAndGenerate( array( 'core.remove_generator' => array() ) );
 
-		$with = (string) file_get_contents( $this->context()->runtimeFile() );
+		$with = $this->storedRuntime();
 
 		$this->assertSame(
 			$without,
 			$with,
-			'The generated runtime must be byte-identical with Pro active.'
+			'What the runtime loads must be identical with Pro active.'
 		);
 
 		$this->assertStringNotContainsString( 'Pro', $with );
@@ -364,15 +369,31 @@ final class ProIntegrationTest extends IntegrationTestCase {
 	}
 
 	/**
+	 * What the free plugin's runtime loads, as a comparable string.
+	 *
+	 * The runtime was a generated PHP file until free 0.3.0 and is an option
+	 * now: the selected handler file names and their validated parameters
+	 * (free D-0070). These tests used to compare the file's bytes; they compare
+	 * the option's contents, which is the same claim about the thing that runs.
+	 *
+	 * `debloater_runtime` is written as a literal on purpose (P4). It is the free
+	 * plugin's contract, and Pro reading it through the free constant would
+	 * follow a rename silently instead of noticing one.
+	 *
+	 * @return string
+	 */
+	private function storedRuntime(): string {
+		return (string) wp_json_encode( get_option( 'debloater_runtime', null ) );
+	}
+
+	/**
 	 * Enough of the site's state to notice a change to it.
 	 *
 	 * @return array<string,mixed>
 	 */
 	private function siteFingerprint(): array {
 		return array(
-			'runtime'   => is_readable( $this->context()->runtimeFile() )
-				? md5( (string) file_get_contents( $this->context()->runtimeFile() ) )
-				: '',
+			'runtime'   => md5( $this->storedRuntime() ),
 			'selection' => $this->plugin->state()->get( 'selection', array() ),
 			'snapshots' => $this->plugin->snapshots()->count(),
 		);
