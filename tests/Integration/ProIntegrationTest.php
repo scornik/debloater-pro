@@ -301,38 +301,26 @@ final class ProIntegrationTest extends IntegrationTestCase {
 	}
 
 	/**
-	 * The priority channel is entitlement-gated, and still verified.
+	 * With every entitlement, Pro hooks no registry origin.
+	 *
+	 * This was the test that the priority registry channel was
+	 * entitlement-gated. The free plugin removed the filter and the fetch it
+	 * fed in 0.4.0, and Pro withdrew the channel rather than rebuilding it
+	 * (D-0078). What remains worth asserting is that a fully entitled Pro
+	 * reaches for none of it.
 	 *
 	 * @return void
 	 */
-	public function test_the_priority_channel_needs_an_entitlement(): void {
-		$unentitled = new Pro( $this->plugin, new FixtureEntitlementProvider(), $this->offlineCloud() );
-
-		$unentitled->boot();
-
-		$this->plugin->resetServices();
-
-		$this->assertSame(
-			\Debloater\Update\RegistryOrigin::DEFAULT_BASE,
-			$this->plugin->registryUpdater()->originBase(),
-			'Without the entitlement, updates come from the public channel.'
-		);
-
-		remove_all_filters( 'debloater_registry_origin' );
-
+	public function test_pro_offers_no_registry_channel(): void {
 		$this->pro->boot();
 
-		$this->plugin->resetServices();
-
-		$this->assertNotSame(
-			\Debloater\Update\RegistryOrigin::DEFAULT_BASE,
-			$this->plugin->registryUpdater()->originBase(),
-			'With the entitlement, updates come from the priority channel.'
+		$this->assertTrue(
+			$this->pro->entitlement()->entitlement()->allows( 'drift_detection' ),
+			'this Pro should be fully entitled, or the next assertion says nothing'
 		);
 
-		// Either way the fetch is still opt-in, and the signature check is
-		// still the same one.
-		$this->assertFalse( $this->plugin->registryUpdater()->enabled() );
+		$this->assertFalse( has_filter( 'debloater_registry_origin' ) );
+		$this->assertFalse( $this->pro->entitlement()->entitlement()->allows( 'priority_registry' ) );
 	}
 
 	/**

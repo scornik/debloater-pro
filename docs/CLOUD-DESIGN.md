@@ -145,9 +145,10 @@ builder's ship list (`scripts/plugin-zip.mjs`), and for the same reason.
    obtain it.
 5. The enrolment code is single-use and expires in 24 hours.
 
-Ed25519 because the plugin already depends on `ext-sodium` for registry
-signature verification (`src/Update/SignatureVerifier.php`), so this adds no new
-cryptographic surface and no new dependency.
+Ed25519 because the plugin depended on `ext-sodium` for registry signature
+verification (`src/Update/SignatureVerifier.php`), so this added no new
+cryptographic surface. *Since free 0.4.0 that verifier is gone with the fetch
+(free D-0073, D-0078), so that reason no longer holds.*
 
 ### Every report
 
@@ -254,7 +255,7 @@ Three rules, and the first is the one to be suspicious of a future self about:
 | Site private key | The site, in `wp_options`, generated locally | The site. Hakeemify never has it. |
 | Site public key | Cloud database | Hakeemify |
 | Registry **signing** key | Offline, on hardware, never in CI | A person |
-| Registry **verification** key | Compiled into the plugin (`SignatureVerifier::PUBLIC_KEY_HEX`) | Everyone. It is public. |
+| Registry **verification** key | Published with the registry. Compiled into the plugin until free 0.4.0, which removed the fetch and the verifier with it (free D-0073, D-0078) | Everyone. It is public. |
 | Cloud TLS | The platform's managed certificate | The platform |
 | Session signing | Cloud secret manager | Hakeemify |
 | Freemius credentials | The storefront | The third party |
@@ -262,8 +263,8 @@ Three rules, and the first is the one to be suspicious of a future self about:
 Two things follow, and both are already true in the shipped code:
 
 **No secret is in the plugin.** §13 rule 15, asserted by `SecurityRulesTest` and
-`ProArchitectureTest`. `PUBLIC_KEY_HEX` is empty until a release is signed, and
-empty means the verifier fails **closed**.
+`ProArchitectureTest`. Since free 0.4.0 there is no verification key in the
+plugin either, because there is nothing left to verify (free D-0073).
 
 **The registry signing key never touches infrastructure.** `tools/registry-manifest.php`
 refuses a key path inside the repository. Signing is a manual act by a person on

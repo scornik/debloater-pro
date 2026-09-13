@@ -55,14 +55,12 @@ final class FreemiusEntitlementProvider implements EntitlementProvider {
 			'drift_detection',
 			'white_label_report',
 			'portable_profiles',
-			'priority_registry',
 		),
 		'agency' => array(
 			'scheduled_scans',
 			'drift_detection',
 			'white_label_report',
 			'portable_profiles',
-			'priority_registry',
 			'multisite',
 		),
 	);

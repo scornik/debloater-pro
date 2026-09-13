@@ -171,7 +171,7 @@ Five extension points, all in `docs/HOOKS.md`, all tested by
 | `debloater_scan_complete` | action | Drift detection |
 | `debloater_apply_complete` | action | Reporting, including on rollbacks |
 | `debloater_dashboard_panels` | filter | Text panels on our screen |
-| `debloater_registry_origin` | filter | The priority channel |
+| ~~`debloater_registry_origin`~~ | filter | ~~The priority channel~~ — removed from free in 0.4.0, channel withdrawn (D-0078) |
 
 The asymmetry is the design. `debloater_loaded` passes the whole plugin, and
 every accessor on it is a getter — an extension can read the resolver, the risk
@@ -183,10 +183,11 @@ and their absence is the point rather than an oversight.
 before the payload is written. An extension that needs an interface of its own
 needs a screen of its own, where it is responsible for its own escaping.
 
-`debloater_registry_origin` can move the channel and cannot relax it: a base
-`RegistryOrigin` refuses is a base nothing fetches from, an unusable value falls
-back to the shipped origin rather than switching updates off, and the manifest
-still faces the same signature check either way.
+`debloater_registry_origin` could move the channel and could not relax it: a
+base `RegistryOrigin` refused was a base nothing fetched from, an unusable value
+fell back to the shipped origin, and the manifest faced the same signature check
+either way. *Historical since free 0.4.0: the filter, the origin and the fetch are
+gone, and Pro no longer offers a channel (D-0078).*
 
 ### Consequences
 
@@ -598,3 +599,68 @@ could do, so removing it makes the copy true rather than smaller.
 Cross-site *sync* — one place that pushes a profile to many sites — remains
 deferred to the cloud phase, as `D-0063` says. It is not this, and nothing
 should imply it is.
+
+---
+
+## D-0078 – Pro stops selling priority registry updates
+
+- **Phase:** Pro 0.3.0, after wordpress.org's round 2 review of the free plugin
+- **Date:** 2026-09-13
+- **Status:** accepted
+- **Removes:** `Features\RegistryChannel` and the `priority_registry` feature
+  key from every plan
+
+### How it came up
+
+wordpress.org refused the free plugin's registry fetch (free D-0073). The plan
+was to move the fetch into Pro, which is not distributed through wordpress.org
+and already listed "priority registry updates" as a feature. Porting it meant
+reading what it did, and it did not do what Pro was selling:
+
+- **It could not find an update.** `wp debloater registry --check-updates` asked
+  for the manifest at the tag the plugin already carried, so it answered
+  "current" whenever that tag was published. Nothing asked what the newest
+  release was.
+- **Nothing installed what it found.** The updater could stage a verified
+  release in memory; nothing ever called that, and the free plugin has no way
+  to load a registry it did not ship.
+- **The priority channel pointed at a repository that does not exist.**
+  `scornik/debloater-registry-priority` was never created.
+
+So the feature was a filter pointing a non-discovering check at a missing
+repository. Every Pro customer who had it got nothing from it, and that was not
+visible from the code's own description of itself (P8).
+
+### Decision
+
+Withdraw it, rather than rebuild it. Building a real one — discovery, delivery,
+an extension point in free to load a downloaded registry, and a second
+repository to run — is a product in its own right, and the free plugin has just
+been told by wordpress.org that the delivery half is the part it may not have.
+
+New rules reach every site, free or Pro, in a plugin release.
+
+### What changed
+
+- `src/Features/RegistryChannel.php` deleted, and its wiring in `Pro`.
+- `priority_registry` removed from the `pro` and `agency` plans in
+  `FreemiusEntitlementProvider::PLANS` and from
+  `FixtureEntitlementProvider::everything()`.
+- The integration test of the channel is replaced by one that a fully entitled
+  Pro hooks no registry origin.
+
+**Not changed here, and needing a person:** the feature list on the Freemius
+plans and pricing page. That is storefront content in the Freemius dashboard,
+which nothing in this repository has credentials for, on purpose
+(`docs/RELEASING.md`, step 8).
+
+### What is asserted
+
+- `ProArchitectureTest::test_pro_fetches_no_registry`: no Pro source names
+  `raw.githubusercontent.com`, `debloater-registry`,
+  `debloater_registry_origin`, `priority_registry` or `RegistryChannel`. Probe:
+  restoring the class fails it on five of those.
+- `EntitlementTest::test_no_plan_sells_a_registry_channel`. Probe: adding the key
+  back to the `pro` plan fails it.
+- `ProIntegrationTest::test_pro_offers_no_registry_channel`. Probe: a `boot()`
+  that hooks the filter fails it.

@@ -136,13 +136,37 @@ final class EntitlementTest extends TestCase {
 
 		$everything = FixtureEntitlementProvider::everything();
 
-		foreach ( array( 'scheduled_scans', 'drift_detection', 'white_label_report', 'portable_profiles', 'priority_registry', 'multisite' ) as $feature ) {
+		foreach ( array( 'scheduled_scans', 'drift_detection', 'white_label_report', 'portable_profiles', 'multisite' ) as $feature ) {
 			$this->assertTrue( $everything->entitlement()->allows( $feature ) );
 		}
 
 		// And a fixture constructed with nothing is inert, so having one in the
 		// tree cannot accidentally unlock anything.
 		$this->assertTrue( ( new FixtureEntitlementProvider() )->entitlement()->isEmpty() );
+	}
+
+	/**
+	 * No plan sells a registry channel, and no provider unlocks one.
+	 *
+	 * "Priority registry updates" was a Pro feature until 0.3.0. It was never
+	 * deliverable: the check it pointed elsewhere could not discover a newer
+	 * release, and the priority repository did not exist. It is withdrawn
+	 * rather than rebuilt (D-0078). Pinned by the literal key, because a
+	 * constant would have been deleted with the class (P4).
+	 *
+	 * @return void
+	 */
+	public function test_no_plan_sells_a_registry_channel(): void {
+		$plans = ( new \ReflectionClassConstant( FreemiusEntitlementProvider::class, 'PLANS' ) )->getValue();
+
+		$this->assertIsArray( $plans );
+		$this->assertNotSame( array(), $plans, 'the plan list was not read' );
+
+		foreach ( $plans as $plan => $features ) {
+			$this->assertNotContains( 'priority_registry', $features, $plan . ' still sells priority registry updates' );
+		}
+
+		$this->assertFalse( FixtureEntitlementProvider::everything()->entitlement()->allows( 'priority_registry' ) );
 	}
 
 	/**

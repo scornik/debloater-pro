@@ -371,6 +371,38 @@ final class ProArchitectureTest extends TestCase {
 	}
 
 	/**
+	 * Pro fetches no registry, from anywhere.
+	 *
+	 * The free plugin stopped fetching in 0.4.0 (free D-0073). The fetch was to
+	 * move here; it was withdrawn instead (D-0078). Literals, not class names,
+	 * because the classes are gone (P4).
+	 *
+	 * @return void
+	 */
+	public function test_pro_fetches_no_registry(): void {
+		$needles   = array( 'raw.githubusercontent.com', 'debloater-registry', 'debloater_registry_origin', 'priority_registry', 'RegistryChannel' );
+		$offenders = array();
+		$read      = 0;
+
+		foreach ( $this->sources() as $path => $source ) {
+			if ( ! str_starts_with( $path, 'pro/' ) ) {
+				continue;
+			}
+
+			++$read;
+
+			foreach ( $needles as $needle ) {
+				if ( str_contains( $source, $needle ) ) {
+					$offenders[] = $path . ' contains ' . $needle;
+				}
+			}
+		}
+
+		$this->assertGreaterThan( 5, $read, 'Pro sources were not read' );
+		$this->assertSame( array(), $offenders, implode( "\n", $offenders ) );
+	}
+
+	/**
 	 * Pro carries no secret, exactly as the free plugin carries none.
 	 *
 	 * @return void

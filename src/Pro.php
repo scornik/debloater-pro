@@ -22,7 +22,6 @@ use Debloater\Pro\Entitlement\FixtureEntitlementProvider;
 use Debloater\Pro\Entitlement\FreemiusEntitlementProvider;
 use Debloater\Pro\Features\BeforeAfterReport;
 use Debloater\Pro\Features\DriftDetector;
-use Debloater\Pro\Features\RegistryChannel;
 use Debloater\Pro\Features\ScheduledScans;
 use Debloater\Pro\Multisite\NetworkDefaults;
 
@@ -94,13 +93,6 @@ final class Pro {
 	private BeforeAfterReport $report;
 
 	/**
-	 * The priority registry channel.
-	 *
-	 * @var RegistryChannel
-	 */
-	private RegistryChannel $channel;
-
-	/**
 	 * Multisite groundwork.
 	 *
 	 * @var NetworkDefaults
@@ -136,7 +128,6 @@ final class Pro {
 		$this->scans   = new ScheduledScans( $plugin, $this->entitlement );
 		$this->drift   = new DriftDetector( $plugin );
 		$this->report  = new BeforeAfterReport( $plugin, $this->entitlement );
-		$this->channel = new RegistryChannel( $this->entitlement );
 		$this->network = new NetworkDefaults( $this->entitlement );
 		$this->screen  = new Screen( $this );
 	}
@@ -166,7 +157,6 @@ final class Pro {
 	 */
 	public function boot(): void {
 		$this->scans->boot();
-		$this->channel->boot();
 		$this->screen->boot();
 
 		add_action( 'admin_init', array( $this->scans, 'sync' ) );
