@@ -131,6 +131,8 @@ final class BeforeAfterReport {
 		$html .= '<style>' . $this->css() . '</style></head><body>';
 
 		$html .= '<h1>' . esc_html( $this->title( $branding ) ) . '</h1>';
+		$html .= '<p class="site">' . esc_html( $this->siteName() ) . '<br />';
+		$html .= esc_html( home_url() ) . '</p>';
 		$html .= '<p class="when">' . esc_html( $run->started_at ) . '</p>';
 
 		if ( array() === $deltas ) {
@@ -267,6 +269,41 @@ final class BeforeAfterReport {
 	}
 
 	/**
+	 * Which site this report is about.
+	 *
+	 * An agency's reports for two clients used to differ only by a run id and a
+	 * timestamp: nothing on the page said whose site it was. This is the line
+	 * that makes a printed copy identifiable once it has left the screen it was
+	 * printed from.
+	 *
+	 * The site's name, or its host when the name is empty — which is a real
+	 * state, not a hypothetical: `blogname` can be cleared in Settings, and a
+	 * report headed by a blank line would be worse than one headed by a
+	 * hostname.
+	 *
+	 * Decoded before it is stripped and escaped again. WordPress escapes
+	 * `blogname` on save (`sanitize_option()`), and `esc_html()` does not
+	 * double-encode, so a name saved as `Acme & <b>Sons</b>` arrives here as
+	 * entities and would print those entities as visible text — safe, and not
+	 * what anybody typed. Decoding first means the tags are real tags again,
+	 * `wp_strip_all_tags()` removes them, and `esc_html()` at the call site
+	 * escapes what is left.
+	 *
+	 * @return string
+	 */
+	private function siteName(): string {
+		$name = trim( wp_strip_all_tags( wp_specialchars_decode( (string) get_bloginfo( 'name' ), ENT_QUOTES ) ) );
+
+		if ( '' !== $name ) {
+			return $name;
+		}
+
+		$host = wp_parse_url( home_url(), PHP_URL_HOST );
+
+		return is_string( $host ) && '' !== $host ? $host : home_url();
+	}
+
+	/**
 	 * The report title.
 	 *
 	 * @param string $branding Agency name, or ''.
@@ -296,6 +333,7 @@ final class BeforeAfterReport {
 	private function css(): string {
 		return 'body{font:14px/1.5 system-ui,sans-serif;margin:2rem;color:#111}'
 			. 'h1{font-size:1.5rem;margin:0 0 .25rem}'
+			. '.site{margin:0 0 .25rem}'
 			. '.when{color:#555;margin:0 0 1.5rem}'
 			. 'table{border-collapse:collapse;width:100%}'
 			. 'th,td{text-align:left;padding:.5rem .75rem;border-bottom:1px solid #ddd}'

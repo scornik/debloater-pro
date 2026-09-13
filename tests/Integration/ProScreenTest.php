@@ -278,6 +278,77 @@ final class ProScreenTest extends IntegrationTestCase {
 	}
 
 	/**
+	 * The report says which site it is about, and escapes both parts.
+	 *
+	 * Without this a printed report is identifiable only by a run id and a
+	 * timestamp, which is no help at all once two clients' reports are on the
+	 * same desk.
+	 *
+	 * @return void
+	 */
+	public function test_the_report_names_the_site(): void {
+		$was = get_option( 'blogname' );
+
+		update_option( 'blogname', 'Acme & <b>Sons</b>' );
+
+		$run  = $this->appliedRun();
+		$html = $this->pro->renderReport( $run );
+
+		// WordPress escapes blogname on save, so what comes back is entities.
+		// The report decodes, strips and escapes again: the ampersand survives
+		// as an ampersand, and the markup is gone rather than shown as text.
+		$this->assertStringContainsString( 'Acme &amp; Sons', $html, 'the site name belongs on the report' );
+		$this->assertStringNotContainsString( '<b>Sons', $html, 'the site name is escaped' );
+		$this->assertStringNotContainsString( '&lt;b&gt;', $html, 'and its markup is stripped, not printed as text' );
+		$this->assertStringContainsString( esc_html( home_url() ), $html, 'the home URL belongs on the report' );
+
+		update_option( 'blogname', $was );
+	}
+
+	/**
+	 * With no site name, the host stands in for it.
+	 *
+	 * `blogname` can be emptied in Settings, and a report headed by a blank
+	 * line is worse than one headed by a hostname.
+	 *
+	 * @return void
+	 */
+	public function test_a_site_with_no_name_is_identified_by_its_host(): void {
+		$was = get_option( 'blogname' );
+
+		update_option( 'blogname', '' );
+
+		$run  = $this->appliedRun();
+		$html = $this->pro->renderReport( $run );
+
+		$host = (string) wp_parse_url( home_url(), PHP_URL_HOST );
+
+		$this->assertNotSame( '', $host, 'this site should have a host, or the fallback is untested' );
+		$this->assertStringContainsString( '<p class="site">' . esc_html( $host ), $html );
+
+		update_option( 'blogname', $was );
+	}
+
+	/**
+	 * Apply something, and hand back the run to report on.
+	 *
+	 * @return int
+	 */
+	private function appliedRun(): int {
+		$this->plugin->scan();
+
+		$preview = $this->plugin->previewTweaks( array( 'core.remove_generator' ) );
+
+		$this->assertNotNull( $preview );
+
+		$applied = $this->plugin->apply( $preview->plan );
+
+		$this->unregisterHandlers( array( 'core.remove_generator' ) );
+
+		return (int) $applied->run_id;
+	}
+
+	/**
 	 * A run that applied nothing is not offered a report.
 	 *
 	 * An aborted run changed nothing and has nothing to compare. Listing one
