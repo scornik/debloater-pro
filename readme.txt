@@ -2,7 +2,7 @@
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.3.0
+Stable tag: 0.3.1
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -30,6 +30,11 @@ is here, and none of it is behind a licence.
 Requires the free Hakeemify Debloater plugin, which does the actual work.
 
 == Changelog ==
+
+= 0.3.1 =
+* Now shown as "Hakeemify Debloater Pro", so it sits beside Hakeemify Debloater
+  in your plugins list as one product family rather than two. Nothing else
+  changes: same plugin, same folder, same licence, same settings.
 
 = 0.3.0 =
 * Works with Debloater under its new name, Hakeemify Debloater. Pro now

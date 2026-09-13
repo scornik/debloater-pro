@@ -63,7 +63,7 @@ final class Pro {
 	 */
 	public const NAME = 'Hakeemify Debloater Pro';
 
-	public const VERSION = '0.3.0';
+	public const VERSION = '0.3.1';
 
 	/**
 	 * The free plugin.
