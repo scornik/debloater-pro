@@ -71,10 +71,31 @@ final class Screen {
 	 *
 	 * @param Pro $pro Pro.
 	 */
-	public function __construct( Pro $pro ) {
-		$this->pro      = $pro;
-		$this->profiles = new ProfilesPanel( $pro );
+	public function __construct( Pro $pro, ?callable $terminate = null ) {
+		$this->pro       = $pro;
+		$this->profiles  = new ProfilesPanel( $pro );
+		$this->terminate = $terminate ?? static function (): void {
+			exit;
+		};
 	}
+
+	/**
+	 * How a request that has sent its whole response ends.
+	 *
+	 * `exit`, everywhere but a test. The report is a complete HTML document
+	 * sent as the entire response, so anything appended to it is inside a
+	 * document that has already closed — and `admin-post.php` ends with
+	 * `do_action( "admin_post_{$action}" )`, so a callback registered after
+	 * this one on the same action would append exactly that.
+	 *
+	 * A bare `exit` cannot be exercised by a test: it takes the test runner
+	 * with it. This is the seam that lets `ReportEndpointTest` run the real
+	 * endpoint, with another plugin's callback attached behind it, and see
+	 * that the callback never printed.
+	 *
+	 * @var callable
+	 */
+	private $terminate;
 
 	/**
 	 * Hook the menu and the post handler.
@@ -181,7 +202,7 @@ final class Screen {
 		// and served as the whole response rather than part of a page.
 		echo $html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped at construction; see BeforeAfterReport::render().
 
-		exit;
+		( $this->terminate )();
 	}
 
 	/**
