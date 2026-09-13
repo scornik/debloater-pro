@@ -394,6 +394,150 @@ final class ProIntegrationTest extends IntegrationTestCase {
 	}
 
 	/**
+	 * A finding whose severity moves between scans is reported as changed.
+	 *
+	 * The category the class docblock calls "drift proper", and until now the
+	 * only one with no test: nothing appeared, nothing resolved, the site moved
+	 * underneath a conclusion already drawn.
+	 *
+	 * A real move, not a rewritten payload. The expired-transients rule is low
+	 * severity from 50 and medium from 1,000, so the site gains enough expired
+	 * transients to cross that line between one scan and the next.
+	 *
+	 * @return void
+	 */
+	public function test_a_severity_move_is_reported_as_changed(): void {
+		$this->seedExpiredTransients( 'debloater_low_', 60 );
+
+		$before = $this->plugin->scan();
+
+		$this->seedExpiredTransients( 'debloater_medium_', 1000 );
+
+		$after = $this->plugin->scan();
+
+		$report = $this->pro->drift()->compare( $before, $after );
+
+		$moved = array();
+
+		foreach ( $report->changed as $entry ) {
+			$moved[ $entry['finding']->id ] = $entry['difference'];
+		}
+
+		$this->assertArrayHasKey( 'db.transients.expired', $moved, 'the finding stayed and its severity moved, so it is changed' );
+		$this->assertSame(
+			array(
+				'from' => 'low',
+				'to'   => 'medium',
+			),
+			$moved['db.transients.expired']['severity'] ?? null
+		);
+
+		// Neither appeared nor resolved: it is the same finding.
+		foreach ( array_merge( $report->appeared, $report->resolved ) as $finding ) {
+			$this->assertNotSame( 'db.transients.expired', $finding->id );
+		}
+
+		// And it reaches the rows as a statement of the move.
+		$this->assertContains( 'severity went from low to medium', array_column( $report->rows(), 'value' ) );
+	}
+
+	/**
+	 * Firing the scheduled scan's hook records a scan.
+	 *
+	 * Nothing fired it before. The schedule was tested — set, cleared,
+	 * `wp_next_scheduled()` agreeing — but never what happens when WP-Cron
+	 * runs it, which is the only part a customer experiences.
+	 *
+	 * The hook is named by its literal (P4): WP-Cron stores it in the `cron`
+	 * option, so a site already scheduled holds this string whatever the
+	 * constant becomes.
+	 *
+	 * @return void
+	 */
+	public function test_the_scheduled_hook_records_a_scan(): void {
+		remove_all_actions( 'debloater_pro_scheduled_scan' );
+
+		$this->pro->boot();
+
+		$before = $this->scanCount();
+
+		do_action( 'debloater_pro_scheduled_scan' );
+
+		$this->assertSame( $before + 1, $this->scanCount(), 'one scan run, recorded by the scheduled event' );
+
+		remove_all_actions( 'debloater_pro_scheduled_scan' );
+	}
+
+	/**
+	 * The entitlement is checked when the event fires, not only when it is set.
+	 *
+	 * A subscription that lapses between scheduling and the next tick must stop
+	 * the scan at that tick. Scheduled while entitled, fired while not.
+	 *
+	 * @return void
+	 */
+	public function test_the_scheduled_hook_refuses_without_the_entitlement(): void {
+		remove_all_actions( 'debloater_pro_scheduled_scan' );
+
+		// Scheduled by a site that could.
+		$this->pro->scans()->setFrequency( 'daily' );
+		$this->assertNotFalse( wp_next_scheduled( 'debloater_pro_scheduled_scan' ) );
+
+		// Fired on a site that no longer can.
+		$lapsed = new Pro( $this->plugin, new FixtureEntitlementProvider(), $this->offlineCloud() );
+		$lapsed->boot();
+
+		$before = $this->scanCount();
+
+		do_action( 'debloater_pro_scheduled_scan' );
+
+		$this->assertSame( $before, $this->scanCount(), 'a lapsed entitlement must stop the scan at the tick' );
+
+		remove_all_actions( 'debloater_pro_scheduled_scan' );
+	}
+
+	/**
+	 * How many scan runs are recorded.
+	 *
+	 * @return int
+	 */
+	private function scanCount(): int {
+		return count( $this->plugin->runs()->recent( 1000, \Debloater\Contracts\RunType::SCAN ) );
+	}
+
+	/**
+	 * Store expired transients, cheaply.
+	 *
+	 * Two statements rather than a thousand `set_transient()` calls. The rows
+	 * are the shape WordPress writes: a value row and a timeout row per
+	 * transient, the timeout in the past.
+	 *
+	 * @param string $prefix Name prefix, unique per call.
+	 * @param int    $count  How many.
+	 * @return void
+	 */
+	private function seedExpiredTransients( string $prefix, int $count ): void {
+		global $wpdb;
+
+		$expired  = time() - HOUR_IN_SECONDS;
+		$values   = array();
+		$timeouts = array();
+
+		for ( $index = 0; $index < $count; $index++ ) {
+			$name       = $prefix . $index;
+			$values[]   = $wpdb->prepare( '(%s, %s, %s)', '_transient_' . $name, 'x', 'off' );
+			$timeouts[] = $wpdb->prepare( '(%s, %s, %s)', '_transient_timeout_' . $name, (string) $expired, 'off' );
+		}
+
+		// phpcs:disable WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery -- Each row above is prepared; this joins prepared fragments into one statement, in a disposable test database.
+		$wpdb->query( "INSERT INTO {$wpdb->options} (option_name, option_value, autoload) VALUES " . implode( ',', $values ) );
+		$wpdb->query( "INSERT INTO {$wpdb->options} (option_name, option_value, autoload) VALUES " . implode( ',', $timeouts ) );
+		// phpcs:enable
+
+		wp_cache_flush();
+	}
+
+	/**
 	 * Two real scans, in order.
 	 *
 	 * @return array{0:\Debloater\Contracts\Run,1:\Debloater\Contracts\Run}
