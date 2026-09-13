@@ -2,7 +2,7 @@
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.3.2
+Stable tag: 0.4.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -30,6 +30,17 @@ is here, and none of it is behind a licence.
 Requires the free Hakeemify Debloater plugin, which does the actual work.
 
 == Changelog ==
+
+= 0.4.0 =
+* "What changed since the last scan" now shows what changed on the site itself:
+  WordPress's version, each active plugin's version, and plugins that were
+  activated or are no longer active — for example "WooCommerce 9.1.4 → 9.2.0".
+  It sits in its own block, apart from what changed in Debloater's findings.
+  Until now a WordPress or plugin update between two scans was not shown at all.
+* Nothing is sent to you when something changes. The licence notices used to
+  call this "drift alerts"; they now say "version change reports", which is what
+  it is: a report you open on your dashboard.
+* Theme versions are not included yet.
 
 = 0.3.2 =
 * The before/after report says which site it is about: the site's name and its

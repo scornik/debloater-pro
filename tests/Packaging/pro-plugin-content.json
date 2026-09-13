@@ -10,7 +10,7 @@
     "Regenerate with tools/record-shipped-content.mjs --why \"...\", in the",
     "commit that changes the shipped code."
   ],
-  "version": "0.3.2",
+  "version": "0.4.0",
   "entry_count": 216,
   "history": [
     {
@@ -317,14 +317,28 @@
         "debloater-pro/src/Features/BeforeAfterReport.php",
         "debloater-pro/src/Pro.php"
       ]
+    },
+    {
+      "version": "0.4.0",
+      "why": "0.4.0: drift compares WordPress and active plugin versions between scans (with activations and deactivations), in a block separate from the findings diff; 'alert' removed from everything that ships, including two licence notices.",
+      "added": [],
+      "removed": [],
+      "changed": [
+        "debloater-pro/debloater-pro.php",
+        "debloater-pro/readme.txt",
+        "debloater-pro/src/Admin/Screen.php",
+        "debloater-pro/src/Features/DriftDetector.php",
+        "debloater-pro/src/Features/DriftReport.php",
+        "debloater-pro/src/Pro.php"
+      ]
     }
   ],
   "entries": {
     "debloater-pro/config/freemius.php.dist": "6b7c4cf726a3919bf2c72f7b4f44c62ba30c008686ec0968c372d992439cf405",
-    "debloater-pro/debloater-pro.php": "ed882fced62935532efda129115a48cdd22a0261b0f6c02a6a2e4d02f9fa138b",
-    "debloater-pro/readme.txt": "5bbbb7fffd2fde26e9d792f4cfbbdb7ded4b7fe7bfed903dddcb6a3cf503efd8",
+    "debloater-pro/debloater-pro.php": "c2134b94980c4418edc1a0fe3787b97d63ddf89d1d37da00e1d84bc4a90f8c0f",
+    "debloater-pro/readme.txt": "5200793f73c5c83e72718d1b2895daa9c17e4a66237abd25fae3c77d4b72164a",
     "debloater-pro/src/Admin/ProfilesPanel.php": "dc025742a4157cb2dbe148ccbc8d3bbf5dd2a8ef56390330780afd2db256353a",
-    "debloater-pro/src/Admin/Screen.php": "96813a13b788ce0fcfc2a6184f1084274d133674e6659679caca1e6dbc0a00ca",
+    "debloater-pro/src/Admin/Screen.php": "973ae8a24097a2dec5063c7a607279800d2ad93cb6a68f5cb42ecff415731dd3",
     "debloater-pro/src/Cloud/CloudResponse.php": "bab1f60f536562a86889fc8cfcc2e23da9ac42c4fe7530111ae8986a12895551",
     "debloater-pro/src/Cloud/CloudServiceClient.php": "81a883fdd1161057ab26d8246db62cacec243a1083a98bed3a0eaa690a46b202",
     "debloater-pro/src/Cloud/EndpointResolver.php": "b50369233bea77c4870a6ebe36d459b3eb513c3381ef64d3cbbf389d57f6e133",
@@ -335,11 +349,11 @@
     "debloater-pro/src/Entitlement/FixtureEntitlementProvider.php": "cb13cf5d98f04b744dca97c82688709838f91455636e120decf6330a6aea121f",
     "debloater-pro/src/Entitlement/FreemiusEntitlementProvider.php": "3f9f95d2db18625394992643257ce8dbeb46b94acd30d7d47e220971db71e9b0",
     "debloater-pro/src/Features/BeforeAfterReport.php": "6ddb8485fd5a1b22877ce1728ee93f2fa083f1bae1c2b9f541e5e93241388da7",
-    "debloater-pro/src/Features/DriftDetector.php": "da860b22dc0760cfb3571bb3231b41a3f4bbe709d5f2b07b3093afca3102fe2d",
-    "debloater-pro/src/Features/DriftReport.php": "945efad888a4b605a5848db799cae5f06ab8f5e57ea2952b07e5d5b8f7406594",
+    "debloater-pro/src/Features/DriftDetector.php": "dc277cab64986818afe84dbfc88e0014196024714f63dd004a62b9db370ce47c",
+    "debloater-pro/src/Features/DriftReport.php": "9b821d7e20199ab8a4d69ac2fa87beddf60ee2527f293d82c4b644c0f91ab97b",
     "debloater-pro/src/Features/ScheduledScans.php": "600c7c1845ad2733ef9905e58f98b9949e87ae7edec75f2964bc53dd94963b76",
     "debloater-pro/src/Multisite/NetworkDefaults.php": "cb743990a178a3d69ec4478285885e29047939d072cc7e2da1a052533dcff0c3",
-    "debloater-pro/src/Pro.php": "54a0157d1b8bb914bd8da22133b68266bad94e9adffb58634aad06565d4b1757",
+    "debloater-pro/src/Pro.php": "f39b58532f1e232dda22e43c3886cb77089fd9f31d367406bce0e0eba9e5a049",
     "debloater-pro/vendor/freemius/wordpress-sdk/LICENSE.txt": "b98fbb37db5b23bc5cfdcd16793206a5a7120a7b01f75374e5e0888376e4691c",
     "debloater-pro/vendor/freemius/wordpress-sdk/README.md": "348f28975ec7e43926cf51741bca466c07ee7deb6abde73f54905e3090a30103",
     "debloater-pro/vendor/freemius/wordpress-sdk/assets/css/admin/account.css": "0863552ad56a38217e8139f1f9211e7bb5845669a917094b666538af5eb1d3a6",
