@@ -496,9 +496,39 @@ final class Screen {
 			return;
 		}
 
-		printf( '<p><strong>%s</strong></p>', esc_html( $report->summary() ) );
+		// Two blocks, not one list. What changed on the site is usually why the
+		// findings moved, and putting both in one table says neither.
+		$this->renderDriftBlock(
+			__( 'On this site', 'debloater-pro' ),
+			$report->versionSummary(),
+			$report->versionRows()
+		);
 
-		$rows = $report->rows();
+		$this->renderDriftBlock(
+			__( 'In what Debloater found', 'debloater-pro' ),
+			$report->summary(),
+			$report->rows()
+		);
+	}
+
+	/**
+	 * One block of the drift section: a heading, a line, and its rows.
+	 *
+	 * @param string                                  $heading What this block is about.
+	 * @param string                                  $summary One line, or '' to print none.
+	 * @param array<int,array{label:string,value:string}> $rows  The rows.
+	 * @return void
+	 */
+	private function renderDriftBlock( string $heading, string $summary, array $rows ): void {
+		if ( '' === $summary && array() === $rows ) {
+			return;
+		}
+
+		printf( '<h3>%s</h3>', esc_html( $heading ) );
+
+		if ( '' !== $summary ) {
+			printf( '<p><strong>%s</strong></p>', esc_html( $summary ) );
+		}
 
 		if ( array() === $rows ) {
 			return;

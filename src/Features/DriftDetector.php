@@ -37,6 +37,31 @@ use Debloater\Plugin;
  *
  * The comparison is on finding **id**, which is stable across scans by
  * construction. Comparing on title would make a copy-edit look like drift.
+ *
+ * ## And what changed on the site itself
+ *
+ * Separately, and kept separate: WordPress's version, and the version of every
+ * active plugin. Those are facts, recorded on every run in its payload, and
+ * until 0.4.0 nothing read them — so a site could take a major WordPress update
+ * between two scans and this reported whatever that did to the findings, never
+ * the update.
+ *
+ * The two are different questions and are not merged. "WooCommerce 9.1.4 →
+ * 9.2.0" is what changed on the site; "1 new finding" is what changed in what
+ * Debloater concluded about it. Mixing them into one list produces a report
+ * where a plugin update and a new finding look like the same kind of event,
+ * and where the cause sits next to the effect with nothing saying which is
+ * which.
+ *
+ * These rows state the change and nothing else. No "should update", no "out of
+ * date": the scanner reports facts and the analyzer draws conclusions, and a
+ * version row that editorialised would be Pro doing the analyzer's job from
+ * outside it (§13, and the free plugin's invariants 1 and 2).
+ *
+ * The theme is absent, deliberately. `theme.active` is a stylesheet slug and
+ * `theme.parent` its template; there is no theme **version** fact to compare,
+ * and adding one is a change to the free plugin's scanner rather than
+ * something to invent here.
  */
 final class DriftDetector {
 
@@ -129,8 +154,164 @@ final class DriftDetector {
 			$after,
 			$appeared,
 			$resolved,
-			$changed
+			$changed,
+			$this->versions( $before, $after )
 		);
+	}
+
+	/**
+	 * What changed on the site itself between two scans.
+	 *
+	 * WordPress's version, and each active plugin's, keyed by plugin file —
+	 * which is the identifier that survives a rename of the plugin's display
+	 * name, and the one `plugins.meta` is keyed by.
+	 *
+	 * A plugin present in one scan's `plugins.active` and not the other's is
+	 * reported as activated or deactivated. This cannot tell deactivated from
+	 * deleted: `plugins.active` says what was running, and a plugin that was
+	 * removed and one that was switched off look identical from here. The row
+	 * says "is no longer active", which is true of both.
+	 *
+	 * @param Run $before The earlier scan.
+	 * @param Run $after  The later scan.
+	 * @return array<int,array{kind:string,name:string,from:string,to:string}>
+	 */
+	private function versions( Run $before, Run $after ): array {
+		$was = $before->facts();
+		$is  = $after->facts();
+
+		$rows = array();
+
+		$core_before = (string) $was->value( 'env.wp_version', '' );
+		$core_after  = (string) $is->value( 'env.wp_version', '' );
+
+		if ( '' !== $core_before && '' !== $core_after && $core_before !== $core_after ) {
+			$rows[] = array(
+				'kind' => 'core',
+				'name' => 'WordPress',
+				'from' => $core_before,
+				'to'   => $core_after,
+			);
+		}
+
+		$before_active = $this->activePlugins( $was );
+		$after_active  = $this->activePlugins( $is );
+		$before_meta   = $this->pluginMeta( $was );
+		$after_meta    = $this->pluginMeta( $is );
+
+		foreach ( $after_active as $file ) {
+			$name = $this->pluginName( $file, $after_meta );
+
+			if ( ! in_array( $file, $before_active, true ) ) {
+				$rows[] = array(
+					'kind' => 'activated',
+					'name' => $name,
+					'from' => '',
+					'to'   => $this->pluginVersion( $file, $after_meta ),
+				);
+
+				continue;
+			}
+
+			$from = $this->pluginVersion( $file, $before_meta );
+			$to   = $this->pluginVersion( $file, $after_meta );
+
+			if ( '' !== $from && '' !== $to && $from !== $to ) {
+				$rows[] = array(
+					'kind' => 'plugin',
+					'name' => $name,
+					'from' => $from,
+					'to'   => $to,
+				);
+			}
+		}
+
+		foreach ( $before_active as $file ) {
+			if ( ! in_array( $file, $after_active, true ) ) {
+				$rows[] = array(
+					'kind' => 'deactivated',
+					'name' => $this->pluginName( $file, $before_meta ),
+					'from' => $this->pluginVersion( $file, $before_meta ),
+					'to'   => '',
+				);
+			}
+		}
+
+		return $rows;
+	}
+
+	/**
+	 * The active plugin files of a run.
+	 *
+	 * @param \Debloater\Contracts\FactSet $facts The run's facts.
+	 * @return array<int,string>
+	 */
+	private function activePlugins( \Debloater\Contracts\FactSet $facts ): array {
+		$active = $facts->value( 'plugins.active', array() );
+
+		if ( ! is_array( $active ) ) {
+			return array();
+		}
+
+		$files = array();
+
+		foreach ( $active as $file ) {
+			if ( is_string( $file ) && '' !== $file ) {
+				$files[] = $file;
+			}
+		}
+
+		return $files;
+	}
+
+	/**
+	 * Per-plugin metadata of a run, keyed by plugin file.
+	 *
+	 * @param \Debloater\Contracts\FactSet $facts The run's facts.
+	 * @return array<string,array<string,mixed>>
+	 */
+	private function pluginMeta( \Debloater\Contracts\FactSet $facts ): array {
+		$meta = $facts->value( 'plugins.meta', array() );
+
+		if ( ! is_array( $meta ) ) {
+			return array();
+		}
+
+		$clean = array();
+
+		foreach ( $meta as $file => $entry ) {
+			if ( is_string( $file ) && is_array( $entry ) ) {
+				$clean[ $file ] = $entry;
+			}
+		}
+
+		return $clean;
+	}
+
+	/**
+	 * A plugin's name, or its file when the scan recorded no name.
+	 *
+	 * @param string                            $file Plugin file.
+	 * @param array<string,array<string,mixed>> $meta Metadata from that scan.
+	 * @return string
+	 */
+	private function pluginName( string $file, array $meta ): string {
+		$name = $meta[ $file ]['name'] ?? '';
+
+		return is_string( $name ) && '' !== $name ? $name : $file;
+	}
+
+	/**
+	 * A plugin's version, or '' when the scan recorded none.
+	 *
+	 * @param string                            $file Plugin file.
+	 * @param array<string,array<string,mixed>> $meta Metadata from that scan.
+	 * @return string
+	 */
+	private function pluginVersion( string $file, array $meta ): string {
+		$version = $meta[ $file ]['version'] ?? '';
+
+		return is_string( $version ) ? $version : '';
 	}
 
 	/**

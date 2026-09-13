@@ -281,6 +281,173 @@ final class ProIntegrationTest extends IntegrationTestCase {
 	}
 
 	/**
+	 * A WordPress or plugin version change is reported, and named.
+	 *
+	 * The feature row promises exactly this, and until 0.4.0 nothing read the
+	 * version facts: `env.wp_version` and `plugins.meta` sat in both runs'
+	 * payloads, and drift compared findings only. A site could take a major
+	 * WordPress update between two scans and this reported whatever that did to
+	 * the findings, never the update.
+	 *
+	 * The two scans are real. Their recorded facts are then rewritten to the
+	 * versions a later scan would have found, because the alternative is
+	 * updating WordPress inside a test.
+	 *
+	 * @return void
+	 */
+	public function test_a_version_change_is_reported(): void {
+		[ $before, $after ] = $this->twoScans();
+
+		$after = $this->withVersions(
+			$after,
+			'9.9.9',
+			array(
+				'acme/acme.php' => array(
+					'name'    => 'Acme',
+					'version' => '2.0.0',
+				),
+			)
+		);
+
+		$before = $this->withVersions(
+			$before,
+			'6.5.2',
+			array(
+				'acme/acme.php' => array(
+					'name'    => 'Acme',
+					'version' => '1.4.0',
+				),
+			)
+		);
+
+		$report = $this->pro->drift()->compare( $before, $after );
+
+		$rows = $this->rowsByLabel( $report->versionRows() );
+
+		$this->assertSame( '6.5.2 → 9.9.9', $rows['WordPress'] ?? '', 'the core version change belongs on the report' );
+		$this->assertSame( '1.4.0 → 2.0.0', $rows['Acme'] ?? '', 'the plugin version change belongs on the report, by name' );
+
+		// Stating the change, and nothing about it.
+		foreach ( $report->versionRows() as $row ) {
+			foreach ( array( 'out of date', 'should', 'must', 'insecure', 'old' ) as $opinion ) {
+				$this->assertStringNotContainsString( $opinion, strtolower( $row['value'] ) );
+			}
+		}
+
+		// And the findings diff is untouched by any of it.
+		$this->assertTrue( $report->isEmpty(), 'no finding moved, so the findings half stays empty' );
+		$this->assertTrue( $report->hasChanges(), 'but something did change' );
+	}
+
+	/**
+	 * A plugin that appears, and one that goes, each get a row.
+	 *
+	 * @return void
+	 */
+	public function test_a_plugin_appearing_and_disappearing_are_reported(): void {
+		[ $before, $after ] = $this->twoScans();
+
+		$meta = array(
+			'acme/acme.php' => array(
+				'name'    => 'Acme',
+				'version' => '1.0.0',
+			),
+		);
+
+		$activated = $this->pro->drift()->compare(
+			$this->withVersions( $before, '6.5.2', array(), array() ),
+			$this->withVersions( $after, '6.5.2', $meta, array( 'acme/acme.php' ) )
+		);
+
+		$this->assertSame(
+			array( 'Acme' => 'was activated, at 1.0.0' ),
+			$this->rowsByLabel( $activated->versionRows() )
+		);
+
+		$deactivated = $this->pro->drift()->compare(
+			$this->withVersions( $before, '6.5.2', $meta, array( 'acme/acme.php' ) ),
+			$this->withVersions( $after, '6.5.2', array(), array() )
+		);
+
+		$this->assertSame(
+			array( 'Acme' => 'is no longer active' ),
+			$this->rowsByLabel( $deactivated->versionRows() )
+		);
+	}
+
+	/**
+	 * Two scans of a site nobody touched report no version changes.
+	 *
+	 * The half of this that matters: a report that finds something in every
+	 * comparison is a report nobody reads twice.
+	 *
+	 * @return void
+	 */
+	public function test_identical_runs_report_no_version_changes(): void {
+		[ $before, $after ] = $this->twoScans();
+
+		$report = $this->pro->drift()->compare( $before, $after );
+
+		$this->assertSame( array(), $report->versions );
+		$this->assertSame( array(), $report->versionRows() );
+		$this->assertSame( '', $report->versionSummary() );
+	}
+
+	/**
+	 * Two real scans, in order.
+	 *
+	 * @return array{0:\Debloater\Contracts\Run,1:\Debloater\Contracts\Run}
+	 */
+	private function twoScans(): array {
+		$before = $this->plugin->scan();
+		$after  = $this->plugin->scan();
+
+		return array( $before, $after );
+	}
+
+	/**
+	 * The same run, with the version facts a later scan would have recorded.
+	 *
+	 * Written through the run's own payload, in the shape `Run::facts()` reads,
+	 * so this exercises the path a scan writes rather than a shape invented
+	 * here.
+	 *
+	 * @param \Debloater\Contracts\Run          $run     The run.
+	 * @param string                            $core    WordPress version.
+	 * @param array<string,array<string,string>> $meta   plugins.meta entries.
+	 * @param array<int,string>|null            $active  plugins.active, or null to derive from $meta.
+	 * @return \Debloater\Contracts\Run
+	 */
+	private function withVersions( \Debloater\Contracts\Run $run, string $core, array $meta, ?array $active = null ): \Debloater\Contracts\Run {
+		$facts = $run->facts()->toArray();
+
+		$facts['env.wp_version'] = $core;
+		$facts['plugins.meta']   = $meta;
+		$facts['plugins.active'] = null === $active ? array_keys( $meta ) : $active;
+
+		$payload          = $run->payload;
+		$payload['facts'] = $facts;
+
+		return $run->withPayload( $payload );
+	}
+
+	/**
+	 * Version rows as label => value, which is how they are read.
+	 *
+	 * @param array<int,array{label:string,value:string}> $rows The rows.
+	 * @return array<string,string>
+	 */
+	private function rowsByLabel( array $rows ): array {
+		$by_label = array();
+
+		foreach ( $rows as $row ) {
+			$by_label[ $row['label'] ] = $row['value'];
+		}
+
+		return $by_label;
+	}
+
+	/**
 	 * Drift appears on the dashboard as text.
 	 *
 	 * @return void

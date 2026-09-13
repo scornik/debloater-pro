@@ -201,6 +201,24 @@ final class Pro {
 			return $panels;
 		}
 
+		// The site's own changes are their own panel. One list holding both
+		// would read as though a plugin update and a new finding were the same
+		// kind of event.
+		if ( array() !== $report->versions ) {
+			$panels[] = array(
+				'title' => __( 'What changed on this site', 'debloater-pro' ),
+				'rows'  => array_merge(
+					array(
+						array(
+							'label' => __( 'Summary', 'debloater-pro' ),
+							'value' => $report->versionSummary(),
+						),
+					),
+					$report->versionRows()
+				),
+			);
+		}
+
 		$panels[] = array(
 			'title' => __( 'What changed since the last scan', 'debloater-pro' ),
 			'rows'  => array_merge(
