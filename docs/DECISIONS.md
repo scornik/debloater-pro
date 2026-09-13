@@ -18,7 +18,7 @@ one thing wherever it is cited. Registry decisions are in
 
 ## Principles
 
-The seven statements that generalise beyond their own subject, **by reference**.
+The nine statements that generalise beyond their own subject, **by reference**.
 The reasoning, the failure each came from and the decision each links to are in
 the free plugin's file, under the same heading — one copy, so there is nothing
 to drift.
@@ -30,6 +30,8 @@ to drift.
 - **P5.** When code encodes a vocabulary that lives somewhere else, test it against the real artifact.
 - **P6.** When both defaults are wrong, refuse.
 - **P7.** Code that decides something is importable; code that runs does not decide.
+- **P8.** A comment asserting a safety property is not the property. Test it or delete it.
+- **P9.** Suppress in the file, never in the config. A config suppression is invisible to whoever runs the tool without it.
 
 `tests/Pro/DecisionRecordTest.php` checks this list against the free plugin's,
 so a principle added or reworded there is not silently missing here.
