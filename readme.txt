@@ -2,7 +2,7 @@
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.2.1
+Stable tag: 0.3.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -30,6 +30,14 @@ is here, and none of it is behind a licence.
 Requires the free Debloater plugin, which does the actual work.
 
 == Changelog ==
+
+= 0.3.0 =
+* Works with Debloater under its new name, Hakeemify Debloater. Pro now
+  requires the plugin by its new folder, `hakeemify-debloater`.
+* Removed priority registry updates. They never delivered anything: the check
+  could not discover a newer release, and the channel it pointed at was never
+  set up. New rules reach every site, with or without Pro, in Debloater's own
+  updates. Nothing else about Pro changes.
 
 = 0.2.1 =
 * The profiles table says what each row is and what it applies. The built-in

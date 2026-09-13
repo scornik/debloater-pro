@@ -48,7 +48,7 @@ final class Pro {
 	/**
 	 * Version.
 	 */
-	public const VERSION = '0.2.1';
+	public const VERSION = '0.3.0';
 
 	/**
 	 * The free plugin.

@@ -10,8 +10,8 @@
     "Regenerate with tools/record-shipped-content.mjs --why \"...\", in the",
     "commit that changes the shipped code."
   ],
-  "version": "0.2.1",
-  "entry_count": 217,
+  "version": "0.3.0",
+  "entry_count": 216,
   "history": [
     {
       "version": "0.1.1",
@@ -277,12 +277,27 @@
       "changed": [
         "debloater-pro/readme.txt"
       ]
+    },
+    {
+      "version": "0.3.0",
+      "why": "0.3.0: priority registry updates withdrawn (RegistryChannel removed, priority_registry out of every plan; D-0078); requires the free plugin by its new slug, hakeemify-debloater.",
+      "added": [],
+      "removed": [
+        "debloater-pro/src/Features/RegistryChannel.php"
+      ],
+      "changed": [
+        "debloater-pro/debloater-pro.php",
+        "debloater-pro/readme.txt",
+        "debloater-pro/src/Entitlement/FixtureEntitlementProvider.php",
+        "debloater-pro/src/Entitlement/FreemiusEntitlementProvider.php",
+        "debloater-pro/src/Pro.php"
+      ]
     }
   ],
   "entries": {
     "debloater-pro/config/freemius.php.dist": "6b7c4cf726a3919bf2c72f7b4f44c62ba30c008686ec0968c372d992439cf405",
-    "debloater-pro/debloater-pro.php": "75e452dfa21a036124fdaaa267f8b8867607cb6c4e0d99b1cffad18e2eecd395",
-    "debloater-pro/readme.txt": "369a3c4e76079755b620c1f723688c683de29a92320fea221a0559e404d1feac",
+    "debloater-pro/debloater-pro.php": "bff159057e77956028708d694b1f2b7e5833544d82cae9b2e32348f85d917e62",
+    "debloater-pro/readme.txt": "d70c6c78022de5df8c4bb1c135ccbb0fdf0a5b41babf70582469e6b1d2a3c8ff",
     "debloater-pro/src/Admin/ProfilesPanel.php": "dc025742a4157cb2dbe148ccbc8d3bbf5dd2a8ef56390330780afd2db256353a",
     "debloater-pro/src/Admin/Screen.php": "713617a18b9258d02366d9b8bc33b4047fd6ebace98648007bff432efa6d872d",
     "debloater-pro/src/Cloud/CloudResponse.php": "bab1f60f536562a86889fc8cfcc2e23da9ac42c4fe7530111ae8986a12895551",
@@ -292,15 +307,14 @@
     "debloater-pro/src/Entitlement/CachedEntitlementProvider.php": "c0330f997e4d47b113e8dab2aa7b0b5e0df55d258350124a848aaec495376977",
     "debloater-pro/src/Entitlement/Entitlement.php": "b13b0766b6a914ea10c4d55598550bf23740d00f41458082b4f7e0ba10432947",
     "debloater-pro/src/Entitlement/EntitlementProvider.php": "e148c9c69383b069f06196f95cee00842fd5c045228d0c26350620e6084e4d77",
-    "debloater-pro/src/Entitlement/FixtureEntitlementProvider.php": "0d73e7f61e1b4fb6ef96d8fa27f64665afd5398afda111f712c3cf224e7cad80",
-    "debloater-pro/src/Entitlement/FreemiusEntitlementProvider.php": "ca5abed06c8734a4194de063c78e2727dfd67dd5b9fcbd30b0185b9fedd60ca6",
+    "debloater-pro/src/Entitlement/FixtureEntitlementProvider.php": "cb13cf5d98f04b744dca97c82688709838f91455636e120decf6330a6aea121f",
+    "debloater-pro/src/Entitlement/FreemiusEntitlementProvider.php": "3f9f95d2db18625394992643257ce8dbeb46b94acd30d7d47e220971db71e9b0",
     "debloater-pro/src/Features/BeforeAfterReport.php": "b03d0e81a8b78ce8347ec3265e264e945fcff334a8c66d5b26121300a0921ac7",
     "debloater-pro/src/Features/DriftDetector.php": "da860b22dc0760cfb3571bb3231b41a3f4bbe709d5f2b07b3093afca3102fe2d",
     "debloater-pro/src/Features/DriftReport.php": "945efad888a4b605a5848db799cae5f06ab8f5e57ea2952b07e5d5b8f7406594",
-    "debloater-pro/src/Features/RegistryChannel.php": "bd4b0014aa80e14b9f3014cc5639b8334537eee35950fcae80ff441babcb6634",
     "debloater-pro/src/Features/ScheduledScans.php": "600c7c1845ad2733ef9905e58f98b9949e87ae7edec75f2964bc53dd94963b76",
     "debloater-pro/src/Multisite/NetworkDefaults.php": "cb743990a178a3d69ec4478285885e29047939d072cc7e2da1a052533dcff0c3",
-    "debloater-pro/src/Pro.php": "152d4eb23526af11dd15229b842938e392c81a35e60c8976f51e17b5c7a59947",
+    "debloater-pro/src/Pro.php": "949930e6ecaf946ac36599af9bdf452ccd521c25d0c3db1b24a73085101519a7",
     "debloater-pro/vendor/freemius/wordpress-sdk/LICENSE.txt": "b98fbb37db5b23bc5cfdcd16793206a5a7120a7b01f75374e5e0888376e4691c",
     "debloater-pro/vendor/freemius/wordpress-sdk/README.md": "348f28975ec7e43926cf51741bca466c07ee7deb6abde73f54905e3090a30103",
     "debloater-pro/vendor/freemius/wordpress-sdk/assets/css/admin/account.css": "0863552ad56a38217e8139f1f9211e7bb5845669a917094b666538af5eb1d3a6",
