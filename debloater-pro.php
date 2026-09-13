@@ -6,7 +6,7 @@
  * Version:           0.2.1
  * Requires at least: 6.5
  * Requires PHP:      8.1
- * Requires Plugins:  debloater
+ * Requires Plugins:  hakeemify-debloater
  * Author:            Hakeemify
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html

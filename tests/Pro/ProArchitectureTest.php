@@ -444,7 +444,7 @@ final class ProArchitectureTest extends TestCase {
 		$free  = $this->requireFreePlugin();
 		$trees = array(
 			$root => array( 'src' ),
-			$free => array( 'src', 'runtime-handlers', 'mu-loader' ),
+			$free => array( 'src', 'runtime-handlers' ),
 		);
 
 		// The entry points, which are not in any of those directories and are
@@ -455,8 +455,8 @@ final class ProArchitectureTest extends TestCase {
 		// Freemius symbol outside the adapter" that never opens the file the
 		// SDK is initialised in is not checking what it says it checks.
 		$entries = array(
-			'pro/debloater-pro.php' => $root . '/debloater-pro.php',
-			'free/debloater.php'    => $free . '/debloater.php',
+			'pro/debloater-pro.php'        => $root . '/debloater-pro.php',
+			'free/hakeemify-debloater.php' => $free . '/hakeemify-debloater.php',
 		);
 
 		foreach ( $trees as $base => $directories ) {
@@ -510,12 +510,17 @@ final class ProArchitectureTest extends TestCase {
 			$candidates[] = $named;
 		}
 
+		// A checkout is named after the repository, a wp-env mapping after the
+		// slug (free D-0071). The entry file decides, not the directory name:
+		// this looked for `debloater.php` until the rename, found nothing, and
+		// skipped every invariant in this class without failing anything.
 		$candidates[] = dirname( __DIR__, 3 ) . '/debloater';
+		$candidates[] = dirname( __DIR__, 3 ) . '/hakeemify-debloater';
 
 		foreach ( $candidates as $candidate ) {
 			$resolved = realpath( $candidate );
 
-			if ( false !== $resolved && is_file( $resolved . '/debloater.php' ) ) {
+			if ( false !== $resolved && is_file( $resolved . '/hakeemify-debloater.php' ) ) {
 				return str_replace( '\\', '/', $resolved );
 			}
 		}

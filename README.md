@@ -65,7 +65,7 @@ The integration tests run from the free plugin's wp-env, with this directory
 mapped in as a second plugin:
 
 ```
-wp-env run tests-cli --env-cwd=wp-content/plugins/debloater \
+wp-env run tests-cli --env-cwd=wp-content/plugins/hakeemify-debloater \
     php tools/phpunit-9.phar -c ../debloater-pro/phpunit-wp.xml.dist
 ```
 

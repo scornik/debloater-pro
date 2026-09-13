@@ -27,7 +27,7 @@ parameters:
 		- vendor/freemius/wordpress-sdk/includes
 
 	scanFiles:
-		- ../debloater/debloater.php
+		- ../debloater/hakeemify-debloater.php
 
 	# The licensing SDK, scanned and not analysed — the same arrangement as the
 	# free plugin above, for the same reason. Pro names `Freemius` in its

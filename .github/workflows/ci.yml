@@ -48,7 +48,7 @@ jobs:
       # Pro *and* Debloater together; without the second tree they answer
       # affirmatively and prove nothing.
       - name: The free plugin is really here
-        run: test -f debloater/debloater.php
+        run: test -f debloater/hakeemify-debloater.php
 
       - uses: shivammathur/setup-php@v2
         with:

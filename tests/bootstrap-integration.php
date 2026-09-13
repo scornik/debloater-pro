@@ -11,7 +11,7 @@
  * They run from the free plugin's wp-env, with this directory mapped as a
  * second plugin:
  *
- *     wp-env run tests-cli --env-cwd=wp-content/plugins/debloater \
+ *     wp-env run tests-cli --env-cwd=wp-content/plugins/hakeemify-debloater \
  *         php tools/phpunit-9.phar -c ../debloater-pro/phpunit-wp.xml.dist
  *
  * The mapping is in the free plugin's `.wp-env.override.json`, which is
@@ -29,16 +29,23 @@ $debloater_pro_dir = dirname( __DIR__ );
 /**
  * Where the free plugin is, inside this container or on this machine.
  *
- * Named by `DEBLOATER_FREE_PATH`, or beside this checkout, which is the layout
- * README.md describes and the one wp-env's mapping produces.
+ * Named by `DEBLOATER_FREE_PATH`, or beside this checkout. "Beside" has two
+ * names since the free plugin was renamed (its D-0071): a git checkout is still
+ * called `debloater`, after the repository, while wp-env maps it into the
+ * container as `hakeemify-debloater`, after the slug. Either is looked for;
+ * what makes a directory the free plugin is its entry file, not its name.
  */
 $debloater_free_dir = getenv( 'DEBLOATER_FREE_PATH' );
 
 if ( ! is_string( $debloater_free_dir ) || '' === $debloater_free_dir ) {
-	$debloater_free_dir = dirname( $debloater_pro_dir ) . '/debloater';
+	$debloater_free_dir = dirname( $debloater_pro_dir ) . '/hakeemify-debloater';
+
+	if ( ! is_readable( $debloater_free_dir . '/hakeemify-debloater.php' ) ) {
+		$debloater_free_dir = dirname( $debloater_pro_dir ) . '/debloater';
+	}
 }
 
-if ( ! is_readable( $debloater_free_dir . '/debloater.php' ) ) {
+if ( ! is_readable( $debloater_free_dir . '/hakeemify-debloater.php' ) ) {
 	// Fails, and does not skip. Everything in this suite is a claim about what
 	// Pro does to a site running Debloater; without Debloater there is nothing
 	// to make the claim against, and a green tick earned by not looking is the
@@ -46,7 +53,7 @@ if ( ! is_readable( $debloater_free_dir . '/debloater.php' ) ) {
 	fwrite(
 		STDERR,
 		"\nThe free plugin is not here.\n\n"
-		. "Looked for debloater.php in:\n"
+		. "Looked for hakeemify-debloater.php in:\n"
 		. "  {$debloater_free_dir}\n\n"
 		. "Pro's integration tests assert what Pro does to a site running Debloater,\n"
 		. "so without it there is nothing to assert against. They fail rather than\n"
