@@ -205,9 +205,17 @@ gone, and Pro no longer offers a channel (D-0078).*
 
 - **Phase:** 19b, part 2
 - **Date:** 2026-09-06
-- **Status:** accepted
+- **Status:** accepted, with its pricing table superseded by `D-0061`
 - **Spec:** §13 rule 13, §13 rule 15
 - **Implements:** D-0035 (licensing is provider-agnostic)
+
+> **Superseded in part, 2026-09-13.** The table below says the pricing rows are
+> "1 site, 20 sites, unlimited" with white-label on the 20-site and unlimited
+> rows. There are four rows — single site, 5, 20, unlimited — and white-label is
+> available on the 5-site row as well. `D-0061` established that when it
+> corrected what white-label does, and `README.md` has carried the four-row
+> table since. The original text is left as written, because a decision record
+> that is edited to be right was never a record of anything.
 
 ### The product
 
