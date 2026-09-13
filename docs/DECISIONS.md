@@ -503,7 +503,12 @@ Three things are needed and they are in three repositories' worth of places:
 The mapping is deliberately not in the free plugin's `.wp-env.json`. That
 repository is public and its environment must start on a machine that has no
 private sibling checkout; a tracked mapping to `../debloater-pro` would make
-`wp-env start` fail for everyone else. `.wp-env.override.json` is gitignored
+`wp-env start` fail for everyone else.
+
+> **Reason amended, 2026-09-13: Pro is public too.** "Private" is no longer why.
+> The arrangement stands for the half of the reason that was always the real
+> one: wp-env can only map a directory that exists, and almost nobody who clones
+> the free plugin has Pro beside it. `.wp-env.override.json` is gitignored
 there and `.distignore` already excludes it from the package.
 
 ### It runs in CI

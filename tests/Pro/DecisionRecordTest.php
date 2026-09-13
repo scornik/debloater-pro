@@ -21,10 +21,15 @@ use PHPUnit\Framework\TestCase;
  * "D-0057" without saying which file it meant.
  *
  * This is the half of the check that can see both trees. Pro's CI checks the
- * free plugin out, so this test compares the two directly. The free plugin
- * cannot check Pro out — it is private and that repository is public — so its
+ * free plugin out, so this test compares the two directly. The free plugin's
  * half asserts the narrower thing it can know alone: that the numbers reserved
  * for Pro do not appear in its own file.
+ *
+ * That half was narrower because Pro was private and the free plugin's public
+ * CI could not check it out. Pro is public now, so that reason has expired: the
+ * free plugin could read this repository's record directly instead of keeping a
+ * copy of the reserved list. Recorded rather than changed, because it is a
+ * change to the free plugin's CI and not to anything here.
  *
  * Between them, a number cannot end up in both files without something going
  * red.

@@ -4,7 +4,9 @@ Workflow features for people who run Debloater on more than one site: scans on
 a schedule, drift detection between one scan and the next, portable profiles, a
 printable before/after report, and a name on that report.
 
-**Private.** The free plugin is [scornik/debloater](https://github.com/scornik/debloater).
+**Public**, like the free plugin at [scornik/debloater](https://github.com/scornik/debloater).
+The code is readable by anyone; a licence is what Freemius issues, not access to
+this repository.
 
 ## What Pro is not
 

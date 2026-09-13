@@ -16,7 +16,9 @@
  *
  * The mapping is in the free plugin's `.wp-env.override.json`, which is
  * untracked. It is there rather than in its `.wp-env.json` on purpose: that
- * repository is public and must not require a private sibling to start. See
+ * repository must start without a Pro checkout beside it, which is how nearly
+ * everyone clones it. (This said "private sibling"; Pro is public now, and the
+ * reason is the same without that word.) See
  * README.md.
  *
  * @package DebloaterPro

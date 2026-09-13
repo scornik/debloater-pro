@@ -4,12 +4,17 @@ name: CI
 # integration suite that runs both plugins in one WordPress, and the rule that
 # nothing secret is committed.
 #
-# Three of these need both trees, and they get both. scornik/debloater is public
-# now, so it is checked out like any other public repository -- no token, no
-# `continue-on-error`, and no job that can pass by not looking. That was not
-# true when this file was written: the free plugin was private, the checkout
-# needed a FREE_PLUGIN_TOKEN nobody had configured, and the invariants asserting
-# "Pro adds nothing to Debloater" skipped on every run while reporting success.
+# Three of these need both trees, and they get both. Both repositories are
+# public, so the free plugin is checked out like any other public repository --
+# no token, no `continue-on-error`, and no job that can pass by not looking.
+# That was not true when this file was written: the free plugin was private,
+# the checkout needed a FREE_PLUGIN_TOKEN nobody had configured, and the
+# invariants asserting "Pro adds nothing to Debloater" skipped on every run
+# while reporting success.
+#
+# Every job that runs PHPUnit fails on a skip. A skip here can only mean a test
+# looked for something that is not where it expected, and CI is the one place
+# configured to have everything.
 
 on:
   push:
@@ -209,16 +214,35 @@ jobs:
       # directly -- `new Pro( $plugin, FixtureEntitlementProvider::everything() )`
       # -- which is what every one of these tests already does, and the reason
       # the mapping only has to make the files reachable.
+      #
+      # The slug is `hakeemify-debloater` since free 0.3.0 (free D-0071). This
+      # said `debloater` until Pro went public: a slug that no longer exists,
+      # so the step exited 1. Nobody saw it, because the repository was private
+      # and its runs were refused for billing before a single job started.
       - name: Activate Debloater
         working-directory: debloater
-        run: npx wp-env run cli wp plugin activate debloater
+        run: npx wp-env run cli wp plugin activate hakeemify-debloater
 
       # The same command a person runs. It refuses, with an explanation, when
       # the mapping is missing -- so a broken environment here says why rather
       # than failing about a path inside a container.
+      #
+      # And nothing may skip, the same rule as the unit job. PHPUnit 9 reports a
+      # skip as "Skipped: N" in the summary line; the output is kept in the log
+      # either way.
       - name: Pro's integration suite
         working-directory: debloater
-        run: npm run test:integration:pro
+        run: |
+          set -o pipefail
+          npm run test:integration:pro 2>&1 | tee integration.log
+
+      - name: Nothing skipped in integration
+        working-directory: debloater
+        run: |
+          if grep -Eq "Skipped: [0-9]+|skipped, or risky" integration.log; then
+            echo "::error::An integration test skipped. CI has both plugins and WordPress; a skip is a test looking in the wrong place."
+            exit 1
+          fi
 
       - name: Stop WordPress
         working-directory: debloater
