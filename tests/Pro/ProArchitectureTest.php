@@ -403,6 +403,38 @@ final class ProArchitectureTest extends TestCase {
 	}
 
 	/**
+	 * Nothing Pro ships calls anything an alert.
+	 *
+	 * Pro sends nothing: no email, no admin notice, no push. Drift is a report
+	 * somebody reads on a screen. "Drift alerts" was on the plan row and in two
+	 * licence notices anyway, and a customer reading "alerts" expects to be told
+	 * without looking. So the word does not appear in anything that ships until
+	 * something actually alerts — at which point this test is the reminder to
+	 * build the sender first.
+	 *
+	 * @return void
+	 */
+	public function test_nothing_shipped_calls_drift_an_alert(): void {
+		$offenders = array();
+		$read      = 0;
+
+		foreach ( $this->sources() as $path => $source ) {
+			if ( ! str_starts_with( $path, 'pro/' ) ) {
+				continue;
+			}
+
+			++$read;
+
+			if ( 1 === preg_match( '/\balerts?\b/i', $source ) ) {
+				$offenders[] = $path;
+			}
+		}
+
+		$this->assertGreaterThan( 5, $read, 'Pro sources were not read' );
+		$this->assertSame( array(), $offenders, 'These ship the word "alert": ' . implode( ', ', $offenders ) );
+	}
+
+	/**
 	 * Pro carries no secret, exactly as the free plugin carries none.
 	 *
 	 * @return void

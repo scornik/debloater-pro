@@ -166,11 +166,11 @@ if ( ! function_exists( 'dp_fs' ) ) {
 		dp_fs()->override_i18n(
 			array(
 				// " %s to access version %s security & feature updates, and support."
-				'x-for-updates-and-support'    => ' %s to access version %s feature updates, drift alerts and priority support.',
+				'x-for-updates-and-support'    => ' %s to access version %s feature updates, version change reports and priority support.',
 
 				// "You can still enjoy all %s features but you will not have
 				//  access to %s security & feature updates, nor support."
-				'after-downgrade-non-blocking' => 'You can still use every %s feature you have already set up, but %s feature updates, drift alerts and priority support stop.',
+				'after-downgrade-non-blocking' => 'You can still use every %s feature you have already set up, but %s feature updates, version change reports and priority support stop.',
 
 				// "Once your license expires you can still use the Free version
 				//  but you will NOT have access to the %s features."

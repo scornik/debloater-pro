@@ -13,7 +13,12 @@ use Debloater\Contracts\Finding;
 use Debloater\Contracts\Run;
 
 /**
- * What changed, in a form the dashboard and an email can both read.
+ * What changed between two scans, as a value the screen and the dashboard read.
+ *
+ * Nothing in Pro sends this anywhere, by email or otherwise; it is read when
+ * somebody opens the screen or the dashboard. This line used to say
+ * "a form the dashboard and an email can both read", describing a delivery
+ * channel that was never built (P8).
  *
  * Holds findings and version rows rather than rendered text, so the screen and
  * the dashboard panel can both read the same comparison instead of each

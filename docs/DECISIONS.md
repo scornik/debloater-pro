@@ -216,6 +216,11 @@ gone, and Pro no longer offers a channel (D-0078).*
 > corrected what white-label does, and `README.md` has carried the four-row
 > table since. The original text is left as written, because a decision record
 > that is edited to be right was never a record of anything.
+>
+> **And its licence-notice strings, 2026-09-13.** The overrides below are
+> described as naming "drift alerts". Nothing in Pro sends an alert; drift is a
+> report read on a screen. Since Pro 0.4.0 the strings say "version change
+> reports".
 
 ### The product
 
