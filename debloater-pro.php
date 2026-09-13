@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name:       Debloater Pro
+ * Plugin Name:       Hakeemify Debloater Pro
  * Plugin URI:        https://github.com/scornik/debloater
  * Description:       Workflow for people who manage several sites: scans on a schedule, drift detection between them, a printable before/after report, and applying a saved profile in one step. Adds nothing to what Debloater does to a site.
  * Version:           0.3.0

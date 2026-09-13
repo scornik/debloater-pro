@@ -1,6 +1,6 @@
 <?php
 /**
- * Wiring for Debloater Pro.
+ * Wiring for Hakeemify Debloater Pro.
  *
  * @package DebloaterPro
  */
@@ -48,6 +48,21 @@ final class Pro {
 	/**
 	 * Version.
 	 */
+	/**
+	 * The product name shown to people. Not translated: it is a proper noun,
+	 * as the free plugin's `Brand::NAME` is.
+	 *
+	 * "Hakeemify Debloater Pro" beside "Hakeemify Debloater", so the plugins list
+	 * reads as one vendor's two products. It was "Debloater Pro" until 0.3.1.
+	 *
+	 * **The name is not the slug and must not follow it.** `debloater-pro` is the
+	 * folder, the main file, the text domain and the Freemius slug, and it is
+	 * bound to Freemius product 38409, the deployed archive and every licence
+	 * issued. A bulk rename that moved it with the name would orphan live
+	 * licences. `DisplayNameTest` pins both, by literal.
+	 */
+	public const NAME = 'Hakeemify Debloater Pro';
+
 	public const VERSION = '0.3.0';
 
 	/**

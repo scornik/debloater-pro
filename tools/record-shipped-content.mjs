@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Record what Debloater Pro ships, for `tools/version-discipline.mjs`.
+ * Record what Hakeemify Debloater Pro ships, for `tools/version-discipline.mjs`.
  *
  *     node tools/record-shipped-content.mjs --why "0.2.0: profiles panel"
  *
@@ -111,7 +111,7 @@ fs.writeFileSync(
 	`${ JSON.stringify(
 		{
 			_comment: [
-				'What Debloater Pro ships, by content hash, and the version it shipped at.',
+				'What Hakeemify Debloater Pro ships, by content hash, and the version it shipped at.',
 				'',
 				'tools/version-discipline.mjs reads this to refuse a build whose shipped',
 				'content has changed while the version has not. Nothing here is exempt:',

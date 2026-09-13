@@ -1,4 +1,4 @@
-# Debloater Pro
+# Hakeemify Debloater Pro
 
 Workflow features for people who run Debloater on more than one site: scans on
 a schedule, drift detection between one scan and the next, portable profiles, a

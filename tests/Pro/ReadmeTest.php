@@ -108,7 +108,7 @@ final class ReadmeTest extends TestCase {
 		$this->assertSame(
 			$value[1],
 			$tested,
-			'Debloater and Debloater Pro are installed together; one may not claim a ceiling the other has not tested.'
+			'Hakeemify Debloater and Hakeemify Debloater Pro are installed together; one may not claim a ceiling the other has not tested.'
 		);
 	}
 

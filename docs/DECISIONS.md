@@ -1,4 +1,4 @@
-# Decisions — Debloater Pro
+# Decisions — Hakeemify Debloater Pro
 
 **Shared decisions live in the free plugin's repository**, at
 <https://github.com/scornik/debloater/blob/main/docs/DECISIONS.md>. That file is

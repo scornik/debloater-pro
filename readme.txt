@@ -1,4 +1,4 @@
-=== Debloater Pro ===
+=== Hakeemify Debloater Pro ===
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
@@ -6,12 +6,12 @@ Stable tag: 0.3.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Workflow for people who run Debloater on more than one site: scheduled scans, drift detection, portable profiles and a printable before/after report.
+Workflow for people who run Hakeemify Debloater on more than one site: scheduled scans, drift detection, portable profiles and a printable before/after report.
 
 == Description ==
 
-Debloater Pro adds workflow to Debloater. It does not add anything Debloater
-does to a site.
+Hakeemify Debloater Pro adds workflow to Hakeemify Debloater. It does not add
+anything Debloater does to a site.
 
 Scans on a schedule, so a site is checked without somebody remembering to.
 Drift detection, so you are told what changed since the last scan rather than
@@ -27,7 +27,7 @@ taken before a change, the verification afterwards, the automatic rollback when
 verification fails, the refusal to delete anything without a backup. None of it
 is here, and none of it is behind a licence.
 
-Requires the free Debloater plugin, which does the actual work.
+Requires the free Hakeemify Debloater plugin, which does the actual work.
 
 == Changelog ==
 

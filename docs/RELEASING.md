@@ -1,4 +1,4 @@
-# Releasing Debloater Pro
+# Releasing Hakeemify Debloater Pro
 
 Every step, in order. CI refuses a release-shaped state that lies about itself,
 but it refuses — it does not fix. Which version comes next is a decision.
@@ -96,7 +96,7 @@ Commit the regenerated record with the release.
 ### 7. Tag, in the same breath as the commit
 
 ```bash
-git tag -a vX.Y.Z -m "Debloater Pro X.Y.Z"
+git tag -a vX.Y.Z -m "Hakeemify Debloater Pro X.Y.Z"
 git push --follow-tags
 ```
 

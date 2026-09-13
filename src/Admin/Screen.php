@@ -101,7 +101,7 @@ final class Screen {
 	public function registerMenu(): void {
 		add_submenu_page(
 			Brand::MENU_SLUG,
-			__( 'Debloater Pro', 'debloater-pro' ),
+			Pro::NAME,
 			__( 'Pro', 'debloater-pro' ),
 			Capabilities::MANAGE,
 			self::SLUG,
@@ -197,7 +197,7 @@ final class Screen {
 		$entitlement = $this->pro->entitlement()->entitlement();
 
 		echo '<div class="wrap">';
-		printf( '<h1>%s</h1>', esc_html__( 'Debloater Pro', 'debloater-pro' ) );
+		printf( '<h1>%s</h1>', esc_html( Pro::NAME ) );
 
 		$this->renderNotice();
 
