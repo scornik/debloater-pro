@@ -2,7 +2,7 @@
 Requires at least: 6.5
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.3.1
+Stable tag: 0.3.2
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -30,6 +30,14 @@ is here, and none of it is behind a licence.
 Requires the free Hakeemify Debloater plugin, which does the actual work.
 
 == Changelog ==
+
+= 0.3.2 =
+* The before/after report says which site it is about: the site's name and its
+  address, at the top. Two clients' reports no longer look the same once
+  printed.
+* Clearer wording for "Name on reports". It said your name replaced ours on the
+  report; there was never a name of ours on it. Your name appears in the
+  report's title and heading.
 
 = 0.3.1 =
 * Now shown as "Hakeemify Debloater Pro", so it sits beside Hakeemify Debloater
