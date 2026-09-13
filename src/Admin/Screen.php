@@ -440,7 +440,7 @@ final class Screen {
 		printf(
 			'<p class="description">%s</p>',
 			esc_html__(
-				'Your agency name, for the printable before/after report. It replaces ours on the page. It does not change any of the numbers.',
+				'Your agency name, for the printable before/after report. It appears in the report\'s title and heading. It does not change any of the numbers.',
 				'debloater-pro'
 			)
 		);

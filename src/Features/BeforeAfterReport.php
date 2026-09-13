@@ -1,6 +1,6 @@
 <?php
 /**
- * The white-label before/after report.
+ * The before/after report, with the agency's name on it.
  *
  * @package DebloaterPro
  */
@@ -22,11 +22,19 @@ use Debloater\Pro\Entitlement\EntitlementProvider;
  * plugin whose entire zip is half a megabyte. Recorded in
  * `docs/DECISIONS.md` D-0049.
  *
- * White-label means the agency's name replaces Hakeemify's. It does not mean
- * the numbers change. Every figure here is a measured delta the free plugin
- * recorded — §12 invariant 14 holds just as firmly in a document meant to
- * impress a client as it does on the dashboard, and arguably more so, because
- * this is the artefact somebody might be paid on the strength of.
+ * The agency's name goes in the title and the heading. Nothing is replaced:
+ * this page has never carried a vendor name, so with no name set it simply
+ * names no one. That is worth saying because the setting used to claim the name
+ * "replaces ours on the page", and because this feature was sold as
+ * "white-label", a word that means something else in this product — a flag on a
+ * licence, hiding the key, prices and invoices (`D-0061`). One word for two
+ * things is a support conversation, so this one is not called that.
+ *
+ * The name does not change the numbers. Every figure here is a measured delta
+ * the free plugin recorded — §12 invariant 14 holds just as firmly in a
+ * document meant to impress a client as it does on the dashboard, and arguably
+ * more so, because this is the artefact somebody might be paid on the strength
+ * of.
  *
  * There is no "faster". There is no score presented as a performance
  * benchmark. There are counts, before and after, and where nothing was measured
@@ -36,6 +44,14 @@ final class BeforeAfterReport {
 
 	/**
 	 * The feature key this needs.
+	 *
+	 * Still `white_label_report`, although nothing calls the feature that any
+	 * more. It is an identifier, not a label: `Entitlement::toArray()` writes
+	 * these keys into the `debloater_pro_entitlement` option, which is cached
+	 * for twelve hours and honoured for fourteen days when Freemius cannot be
+	 * reached. Renaming it would lock the feature on every site running on a
+	 * cached answer until that answer expired. Rename it with a migration, or
+	 * not at all.
 	 */
 	public const FEATURE = 'white_label_report';
 

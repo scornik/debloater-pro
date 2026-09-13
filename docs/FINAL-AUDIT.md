@@ -166,7 +166,7 @@ Everything else in §21.7 ran to completion on this machine. Nothing was skipped
 
 | Deferred | Where |
 |---|---|
-| Server-side PDF in the white-label report | D-0049 — the smallest usable library is ten times the plugin's size |
+| Server-side PDF in the before/after report | D-0049 — the smallest usable library is ten times the plugin's size |
 | Any inbound cloud control path, including remote apply | `CLOUD-DESIGN.md` §2, §12 — a v1 that can command a site is a different product |
 | SSO, team roles, webhooks, public API, white-label domains, multi-region, real-time | `CLOUD-DESIGN.md` §12 — eleven items, each with a reason |
 | Multisite beyond network defaults | §1 locked decision 8; groundwork exists behind `DEBLOATER_PRO_MULTISITE` |
